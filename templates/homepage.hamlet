@@ -1,0 +1,25 @@
+<h1>Appian Plugins
+
+$if null fileList
+  <p> No plugins installed
+$else
+  <h2>Submitted plugins
+  <form method=post action=@{HomeR} enctype=#{formEnctype}>
+    <!-- ^{tableWidget} -->
+    <table class="table table-striped">
+      <thead>
+        <th>File Name
+        <th>
+      <tbody>
+        $forall (file, idx) <- files
+                           <tr>
+                             <td>#{file}
+                             <td><input id="#{idx}" type="checkbox" name="checkbox" value="#{file}" :showVal id val:checked>
+                           <br>
+    <button .btn .btn-dange type="submit" value="delete" name="action">
+      Delete
+
+<form method=post action=@{HomeR}#form enctype=#{formEnctype}>
+    ^{formWidget}
+  <button .btn .btn-primary type="submit" value="upload" name="action">
+     Send it! <span class="glyphicon glyphicon-upload"></span>

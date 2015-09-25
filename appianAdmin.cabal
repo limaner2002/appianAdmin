@@ -1,0 +1,97 @@
+name:              appianAdmin
+version:           0.0.0
+cabal-version:     >= 1.8
+build-type:        Simple
+
+Flag dev
+    Description:   Turn on development settings, like auto-reload templates.
+    Default:       False
+
+Flag library-only
+    Description:   Build for use with "yesod devel"
+    Default:       False
+
+library
+    hs-source-dirs: ., app
+    exposed-modules: Application
+                     Foundation
+                     Import
+                     Import.NoFoundation
+                     Model
+                     Settings
+                     Settings.StaticFiles
+                     Handler.Common
+                     Handler.Home
+
+    if flag(dev) || flag(library-only)
+        cpp-options:   -DDEVELOPMENT
+        ghc-options:   -Wall -fwarn-tabs -O0
+    else
+        ghc-options:   -Wall -fwarn-tabs -O2 -fllvm
+
+    extensions: TemplateHaskell
+                QuasiQuotes
+                OverloadedStrings
+                NoImplicitPrelude
+                CPP
+                MultiParamTypeClasses
+                TypeFamilies
+                GADTs
+                GeneralizedNewtypeDeriving
+                FlexibleContexts
+                FlexibleInstances
+                EmptyDataDecls
+                NoMonomorphismRestriction
+                DeriveDataTypeable
+                ViewPatterns
+                TupleSections
+                RecordWildCards
+
+    build-depends: base
+                 , yesod
+                 , yesod-core
+                 , yesod-auth
+                 , yesod-static
+                 , yesod-form
+                 , classy-prelude
+                 , classy-prelude-conduit
+                 , classy-prelude-yesod
+                 , bytestring
+                 , text
+                 , persistent
+                 , persistent-sqlite
+                 , persistent-template
+                 , template-haskell
+                 , shakespeare
+                 , hjsmin
+                 , monad-control
+                 , wai-extra
+                 , yaml
+                 , http-conduit
+                 , directory
+                 , warp
+                 , data-default
+                 , aeson
+                 , conduit
+                 , monad-logger
+                 , fast-logger
+                 , wai-logger
+                 , file-embed
+                 , safe
+                 , unordered-containers
+                 , containers
+                 , vector
+                 , time
+                 , stm
+                 , yesod-table
+
+executable         appianAdmin
+    if flag(library-only)
+        Buildable: False
+
+    main-is:           main.hs
+    hs-source-dirs:    app
+    build-depends:     base, appianAdmin
+
+    ghc-options:       -threaded -O2 -rtsopts -with-rtsopts=-N
+
