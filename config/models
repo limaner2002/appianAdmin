@@ -9,5 +9,9 @@ Email
     user UserId Maybe
     verkey Text Maybe
     UniqueEmail email
-
+Plugin
+    fileName Text
+    path Text
+    UniquePlugin fileName
+    Primary fileName
  -- By default this file is used in Model.hs (which is imported by Foundation.hs)

@@ -22,8 +22,7 @@ getHomeR :: Handler Html
 getHomeR = do
   (formWidget, formEnctype) <- generateFormPost sampleForm
   fileList <- getList
-  let tableWidget = Table.buildBootstrap fileTable fileList
-      files = zip (map fst fileList) ([1..] :: [Int])
+  let files = zip (map pluginFileName fileList) ([1..] :: [Int])
   defaultLayout $ do
              aDomId <- newIdent
              setTitle "Appian Plugins"
@@ -37,24 +36,24 @@ postHomeR = do
   case (result, action) of
     (FormFailure _, Just "delete") -> do
                 app <- getYesod
-                deleteFile checked $ appFiles app
+                deleteFile checked
                 redirect HomeR
     (FormSuccess fi, Just "upload") -> do
                 app <- getYesod
-                let filePath = "/tmp/" ++ (T.unpack $ fName)
-                    files = appFiles app
+                let filePath = T.concat ["/tmp/", fName]
                     fName = fileName fi
-                fileMap <- liftIO $ readTVarIO files
-                case M.lookup fName fileMap of
-                  Nothing -> do
-                          runResourceT $ fileSource fi $$ sinkFile filePath
-                          addFile (appFiles app) (fileName fi) (T.pack filePath)
-                  Just _ -> return ()
+                runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
+                addFile (Plugin fName filePath)
+                -- result <- runDB $ selectFirst [PluginId ==. PluginKey fName] []
+                -- case result of
+                --   Nothing -> do
+                --           runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
+                --           addFile (Plugin fName filePath)
+                --   Just _ -> return ()
     _ -> return ()
 
   fileList <- getList
-  let tableWidget = Table.buildBootstrap fileTable fileList
-      files = zip (map fst fileList) ([1..] :: [Int])
+  let files = zip (map pluginFileName fileList) ([1..] :: [Int])
   defaultLayout $ do
              aDomId <- newIdent
              setTitle "Appian Plugins"

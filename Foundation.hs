@@ -29,7 +29,7 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
-    , appFiles       :: STM.TVar FileMap
+    , dbLock         :: STM.TVar Bool
     }
 
 instance HasHttpManager App where
@@ -123,8 +123,8 @@ instance Yesod App where
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend
     runDB action = do
-        master <- getYesod
-        runSqlPool action $ appConnPool master
+      master <- getYesod
+      runSqlPool action $ appConnPool master
 instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
 
@@ -167,33 +167,34 @@ unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger
 -- https://github.com/yesodweb/yesod/wiki/Serve-static-files-from-a-separate-domain
 -- https://github.com/yesodweb/yesod/wiki/i18n-messages-in-the-scaffolding
 
-getList :: Handler [(FileName, Path)]
+getList :: Handler [Plugin]
 getList = do
-  app <- getYesod
-  files <- liftIO $ STM.readTVarIO $ appFiles app
-  return $ M.toList files
+  vals <- runDB $ selectList [] []
+  return $ map entityVal vals
 
-addFile :: STM.TVar FileMap -> FileName -> Path -> Handler ()
-addFile tstore name path =
-    liftIO . STM.atomically $ do
-      STM.modifyTVar tstore $ \files -> M.insert name path files
+addFile :: Plugin -> Handler ()
+addFile plugin =
+  runDB $ insert_ plugin
 
-deleteFile :: [FileName] -> STM.TVar FileMap -> Handler ()
-deleteFile keys tstore = do
-  mapM_ (\key -> do
-           files <- liftIO $ STM.readTVarIO tstore
-           let mPath = M.lookup key files
-           case mPath of
-             Nothing -> do
-                        liftIO $ putStrLn ("File " ++ key ++ " does not exist!")
-                        liftIO $ print files
-             Just path -> liftIO $ removeFile (T.unpack path) `catch` handleExists
-        ) keys
-  liftIO . STM.atomically $ do
-      STM.modifyTVar tstore $
-             \files -> do
-               foldr (\key m -> M.delete key m) files keys
-  where
-    handleExists e
-        | isDoesNotExistError e = return ()
-        | otherwise = throwIO e
+deleteFile :: [FileName] -> Handler ()
+deleteFile fileNames = do
+  runDB $ mapM_ (\fileName -> do
+                   let key = PluginKey fileName
+                   res <- get key
+                   case res of
+                     Nothing -> return ()
+                     Just (Plugin _ path) ->
+                              liftIO $ removeFile (T.unpack path) `catch` handleExists
+                   delete key
+                ) fileNames
+
+ where
+   handleExists e
+       | isDoesNotExistError e = return ()
+       | otherwise = throwIO e
+-- safeRunDB action = do
+--   app <- getYesod
+--   let lock = dbLock app
+--   atomically $ STM.modifyTVar lock $ \_ -> True
+--   runDB action
+--   atomically $ STM.modifyTVar lock $ \_ -> False
