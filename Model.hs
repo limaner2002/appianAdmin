@@ -9,3 +9,27 @@ import Database.Persist.Quasi
 -- http://www.yesodweb.com/book/persistent/
 share [mkPersist sqlSettings, mkMigrate "migrateAll"]
     $(persistFileWith lowerCaseSettings "config/models")
+
+data AppianLog = JBoss | Application
+               deriving Read
+
+instance Show AppianLog where
+    show JBoss = "JBoss"
+    show Application = "Application"
+
+instance Eq AppianLog where
+    (==) JBoss JBoss = True
+    (==) Application Application = True
+    (==) _ _ = False
+
+    (/=) JBoss JBoss = False
+    (/=) Application Application = False
+    (/=) _ _ = True
+
+instance PathPiece AppianLog where
+    fromPathPiece val
+        | val == "JBoss" = Just JBoss
+        | val == "Application" = Just Application
+        | otherwise = Nothing
+
+    toPathPiece log = pack $ show log

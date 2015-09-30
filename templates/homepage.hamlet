@@ -23,3 +23,11 @@ $else
     ^{formWidget}
   <button .btn .btn-primary type="submit" value="upload" name="action">
      Send it! <span class="glyphicon glyphicon-upload"></span>
+
+<h1>Appian Logs
+
+<a href=@{AppianLogR JBoss}>
+  JBoss
+<br>
+<a href=@{AppianLogR Application}>
+  Application Server

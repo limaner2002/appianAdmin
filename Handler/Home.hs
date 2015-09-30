@@ -40,16 +40,10 @@ postHomeR = do
                 redirect HomeR
     (FormSuccess fi, Just "upload") -> do
                 app <- getYesod
-                let filePath = T.concat ["/tmp/", fName]
+                let filePath = T.concat ["/opt/appian/_admin/plugins/", fName]
                     fName = fileName fi
                 runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
                 addFile (Plugin fName filePath)
-                -- result <- runDB $ selectFirst [PluginId ==. PluginKey fName] []
-                -- case result of
-                --   Nothing -> do
-                --           runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
-                --           addFile (Plugin fName filePath)
-                --   Just _ -> return ()
     _ -> return ()
 
   fileList <- getList

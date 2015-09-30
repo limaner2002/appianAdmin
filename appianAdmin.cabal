@@ -22,12 +22,13 @@ library
                      Settings.StaticFiles
                      Handler.Common
                      Handler.Home
+                     Handler.AppianLog
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
         ghc-options:   -Wall -fwarn-tabs -O0
     else
-        ghc-options:   -Wall -fwarn-tabs -O2 -fllvm
+        ghc-options:   -Wall -fwarn-tabs -O2
 
     extensions: TemplateHaskell
                 QuasiQuotes
@@ -84,6 +85,7 @@ library
                  , time
                  , stm
                  , yesod-table
+                 , mime-types
 
 executable         appianAdmin
     if flag(library-only)
