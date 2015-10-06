@@ -20,7 +20,8 @@ import Language.Haskell.TH.Syntax           (qLocation)
 import Network.Wai.Handler.Warp             (Settings, defaultSettings,
                                              defaultShouldDisplayException,
                                              runSettings, setHost,
-                                             setOnException, setPort, getPort)
+                                             setOnException, setPort, getPort,
+                                             setOnClose, setOnOpen)
 import Network.Wai.Middleware.RequestLogger (Destination (Logger),
                                              IPAddrSource (..),
                                              OutputFormat (..), destination,
@@ -48,12 +49,14 @@ makeFoundation appSettings = do
     -- Some basic initializations: HTTP connection manager, logger, and static
     -- subsite.
     appHttpManager <- newManager
-    appLogger <- newStdoutLoggerSet defaultBufSize >>= makeYesodLogger
+    appLogger <- newStdoutLoggerSet 1 >>= makeYesodLogger
     appStatic <-
         (if appMutableStatic appSettings then staticDevel else static)
         (appStaticDir appSettings)
     db <- atomically $ newTVar False
 
+    chan <- atomically newBroadcastTChan
+    users <- atomically $ newTVar 0
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a
     -- logging function. To get out of this loop, we initially create a
@@ -65,6 +68,9 @@ makeFoundation appSettings = do
         -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
         tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
         logFunc = messageLoggerSource tempFoundation appLogger
+        dbLock = db
+        logChannel = chan
+        currentLogUsers = users
 
     -- Create the database connection pool
     pool <- flip runLoggingT logFunc $ createSqlitePool

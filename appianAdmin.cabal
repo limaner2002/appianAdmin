@@ -23,6 +23,7 @@ library
                      Handler.Common
                      Handler.Home
                      Handler.AppianLog
+                     TailFile
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
@@ -86,6 +87,11 @@ library
                  , stm
                  , yesod-table
                  , mime-types
+                 , yesod-websockets
+                 , yesod-eventsource
+                 , fsnotify
+                 , conduit-extra
+                 , transformers
 
 executable         appianAdmin
     if flag(library-only)

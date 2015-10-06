@@ -24,12 +24,14 @@ type FileMap = M.Map FileName Path
 -- starts running, such as database connections. Every handler will have
 -- access to the data present here.
 data App = App
-    { appSettings    :: AppSettings
-    , appStatic      :: Static -- ^ Settings for static file serving.
-    , appConnPool    :: ConnectionPool -- ^ Database connection pool.
-    , appHttpManager :: Manager
-    , appLogger      :: Logger
-    , dbLock         :: STM.TVar Bool
+    { appSettings       :: AppSettings
+    , appStatic         :: Static -- ^ Settings for static file serving.
+    , appConnPool       :: ConnectionPool -- ^ Database connection pool.
+    , appHttpManager    :: Manager
+    , appLogger         :: Logger
+    , dbLock            :: STM.TVar Bool
+    , logChannel        :: TChan ByteString
+    , currentLogUsers   :: STM.TVar Int
     }
 
 instance HasHttpManager App where
@@ -198,3 +200,30 @@ deleteFile fileNames = do
 --   atomically $ STM.modifyTVar lock $ \_ -> True
 --   runDB action
 --   atomically $ STM.modifyTVar lock $ \_ -> False
+
+getChannel = do
+  app <- getYesod
+  return $ logChannel app
+
+getNLogUsers = do
+  mLogUsers <- getLogUsers
+  atomically $ STM.readTVar mLogUsers
+
+getLogUsers = do
+  app <- getYesod
+  return $ currentLogUsers app
+
+incLogUsers = do
+  mLogUsers <- getLogUsers
+  atomically $ STM.modifyTVar mLogUsers $
+             \n -> n + 1
+  return ()
+
+decLogUsers = do
+  mLogUsers <- getLogUsers
+  atomically $ STM.modifyTVar mLogUsers $
+             \logUsers ->
+                 case logUsers of
+                   0 -> 0
+                   n -> n - 1
+  return ()

@@ -60,3 +60,4 @@ fileTable :: Table App (T.Text, T.Text)
 fileTable = mempty
   <> Table.text "File Name" fst
   <> Table.text "File Path" snd
+
