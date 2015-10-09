@@ -13,6 +13,11 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"]
 data AppianLog = JBoss | Application
                deriving Read
 
+data AppianLogMessage = AppianLogMessage
+                      { contents :: Text
+                      , position :: Integer
+                      } deriving Show
+
 instance Show AppianLog where
     show JBoss = "JBoss"
     show Application = "Application"
@@ -33,3 +38,11 @@ instance PathPiece AppianLog where
         | otherwise = Nothing
 
     toPathPiece log = pack $ show log
+
+instance ToJSON AppianLogMessage where
+    toJSON (AppianLogMessage contents position) =
+        object ["contents" .= contents, "position" .= position]
+
+instance Monoid AppianLogMessage where
+    mempty = AppianLogMessage mempty 0
+

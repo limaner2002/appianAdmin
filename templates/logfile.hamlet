@@ -1,4 +1,3 @@
 <h1>Real Time Updates
 <div #output>
-<form #form>
-  <input #input>
+     <p #log>

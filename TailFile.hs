@@ -15,7 +15,8 @@ import Control.Monad.IO.Class
 import Control.Concurrent.STM
 import qualified Data.Map as M
 import Yesod.WebSockets (sendTextData, webSockets, WebSocketsT)
-import Import hiding (atomically, withManager)
+import Import hiding (atomically, withManager, (<>))
+import Data.Monoid ((<>))
 
 type PosMap = M.Map FilePath Integer
 type FilePosition = TVar PosMap
@@ -23,30 +24,19 @@ type FilePosition = TVar PosMap
 initialFilePosition :: IO FilePosition
 initialFilePosition = atomically $ newTVar mempty
 
-myAction :: (MonadIO m) => TChan ByteString -> FilePosition -> Event -> m ()
+myAction :: (MonadIO m) => TChan AppianLogMessage -> FilePosition -> Event -> m ()
 myAction _ pos (Added path time) = do
+  putStrLn $ "File " <> pack path <> " was added"
   posMap <- liftIO $ atomically $ readTVar pos
   case contains path posMap of
     True -> setPos pos path 0
     False -> return ()
 myAction channel pos (Modified path time) = do
-  posMap <- liftIO $ atomically $ readTVar pos
-  case contains path posMap of
-    True ->
-        liftIO $ withBinaryFile path ReadMode $ \handle ->
-            sourceHandle handle $$ do
-               previousPos <- liftIO $ getPos pos path
-               size <- liftIO $ hFileSize handle
-               liftIO $ hSeek handle AbsoluteSeek previousPos
-               mContents <- await
-               case mContents of
-                 Nothing -> return ()
-                 Just contents -> do
-                                liftIO $ atomically $ writeTChan channel contents
-               liftIO $ setPos pos path size
-    False -> return ()
-
-myAction _ pos (Removed path time) = return ()
+  putStrLn $ "File " <> pack path <> " was modified"
+  readDesiredFile channel pos path
+myAction _ pos (Removed path time) = do
+  putStrLn $ "File " <> pack path <> " was removed"
+  return ()
 
 setPos :: MonadIO m => FilePosition -> FilePath -> Integer -> m ()
 setPos pos filePath newPos =
@@ -60,11 +50,12 @@ getPos tPos filePath = do
       Nothing -> return 0
       Just p -> return p
 
-tailFile :: MonadIO m => TChan ByteString -> TVar Int -> FilePath -> m ()
+tailFile :: MonadIO m => TChan AppianLogMessage -> TVar Int -> FilePath -> m ()
 tailFile channel tLogUsers path = do
   filePos <- liftIO $ initialFilePosition
   setPos filePos path 0
   liftIO $ withManager $ \mgr -> do
+    readDesiredFile channel filePos path
     -- start a watching job (in the background)
     watchDir
       mgr          -- manager
@@ -87,16 +78,34 @@ contains path posMap =
     Nothing -> False
     Just _ -> True
 
-readFile :: MonadIO m => Integer -> FilePath -> m Text
-readFile pos path =
+readFilePart :: MonadIO m => FilePosition -> FilePath -> m AppianLogMessage
+readFilePart pos path =
     liftIO $ withBinaryFile path ReadMode $ \handle ->
         sourceHandle handle $$ do
+          liftIO $ putStrLn "Reading file now"
           previousPos <- liftIO $ getPos pos path
           size <- liftIO $ hFileSize handle
           liftIO $ hSeek handle AbsoluteSeek previousPos
           mContents <- await
+          liftIO $ setPos pos path size
+          print mContents
           case mContents of
-            Nothing -> return ()
+            Nothing -> return mempty
             Just contents -> do
-                           liftIO $ atomically $ writeTChan channel contents
-            liftIO $ setPos pos path size
+                           return $ AppianLogMessage contents size
+
+writeChannel :: (MonadIO m, Show a) => TChan a -> a -> m ()
+writeChannel channel contents = do
+  putStrLn $ "Writing " <> pack (show contents) <> " to channel"
+  liftIO $ atomically $ writeTChan channel contents
+
+readDesiredFile :: (MonadIO m) => TChan AppianLogMessage -> FilePosition -> FilePath -> m ()
+readDesiredFile channel pos path = do
+  putStrLn $ "Reading file " <> pack path
+  posMap <- liftIO $ atomically $ readTVar pos
+  putStrLn $ "posMap: " <> pack (show posMap)
+  case contains path posMap of
+    True -> do
+      contents <- readFilePart pos path
+      writeChannel channel contents
+    False -> return ()

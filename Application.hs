@@ -49,13 +49,13 @@ makeFoundation appSettings = do
     -- Some basic initializations: HTTP connection manager, logger, and static
     -- subsite.
     appHttpManager <- newManager
-    appLogger <- newStdoutLoggerSet 1 >>= makeYesodLogger
+    appLogger <- newStdoutLoggerSet defaultBufSize >>= makeYesodLogger
     appStatic <-
         (if appMutableStatic appSettings then staticDevel else static)
         (appStaticDir appSettings)
     db <- atomically $ newTVar False
 
-    chan <- atomically newBroadcastTChan
+    chan <- atomically newTChan
     users <- atomically $ newTVar 0
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a

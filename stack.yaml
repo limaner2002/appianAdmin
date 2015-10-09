@@ -1,7 +1,7 @@
 flags:
   appianAdmin:
     library-only: false
-    dev: false
+    dev: true
 packages:
 - '.'
 extra-deps: []

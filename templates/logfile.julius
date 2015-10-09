@@ -1,23 +1,32 @@
 var url = document.URL,
     output = document.getElementById("output"),
-    form = document.getElementById("form"),
-    input = document.getElementById("input"),
-    conn;
+    conn,
+    p = document.getElementById("log"),
+    currentPosition = 0;
 
 url = url.replace("http:", "ws:").replace("https:", "wss:");
 conn = new WebSocket(url);
+output.appendChild(p);
 
 conn.onmessage = function(e) {
-    var lines = e.data.split("\n");
+    var logMessage = JSON.parse(e.data),
+	contents = logMessage.contents,
+        lines = contents.split("\n"),
+        line;
     for (var i = 0; i < lines.length; i++){
-	var p = document.createElement("p");
-	p.appendChild(document.createTextNode(lines[i]));
-	output.appendChild(p);
+    	line = lines[i];
+    	if(line.length > 0){
+    	    p.appendChild(document.createTextNode(line));
+    	    p.appendChild(document.createElement("br"));
+    	}
     }
+    currentPosition = contents.length;
+    p.appendChild(document.createTextNode("Current position: "+currentPosition));
+    p.appendChild(document.createElement("br"));
+    p.appendChild(document.createTextNode("Current file position: "+logMessage.position));
+    p.appendChild(document.createElement("br"));
 };
 
-form.addEventListener("submit", function(e){
-    conn.send(input.value);
-    input.value = "";
+output.addEventListener("submit", function(e){
     e.preventDefault();
 });

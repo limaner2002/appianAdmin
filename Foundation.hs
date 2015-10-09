@@ -30,7 +30,7 @@ data App = App
     , appHttpManager    :: Manager
     , appLogger         :: Logger
     , dbLock            :: STM.TVar Bool
-    , logChannel        :: TChan ByteString
+    , logChannel        :: TChan AppianLogMessage
     , currentLogUsers   :: STM.TVar Int
     }
 
