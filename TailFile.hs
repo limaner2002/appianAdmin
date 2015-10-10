@@ -18,6 +18,7 @@ import Yesod.WebSockets (sendTextData, webSockets, WebSocketsT)
 import Import hiding (atomically, withManager, (<>))
 import Data.Monoid ((<>))
 import Foundation
+import System.FilePath
 
 -- type PosMap = M.Map FilePath Integer
 -- type FilePosition = TVar PosMap
@@ -61,10 +62,10 @@ tailFile tLogUsers tLogFiles path = do
     readDesiredFile tLogFiles path
     -- start a watching job (in the background)
     watchDir
-      mgr          -- manager
-      "/tmp/"          -- directory to watch
-      (const True) -- predicate
-      (myAction tLogFiles)     -- action
+      mgr                    -- manager
+      (takeDirectory path)   -- directory to watch
+      (const True)           -- predicate
+      (myAction tLogFiles)   -- action
     sleep tLogUsers
 
 sleep :: MonadIO m => TVar Int -> m ()

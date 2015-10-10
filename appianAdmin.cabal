@@ -92,6 +92,7 @@ library
                  , fsnotify
                  , conduit-extra
                  , transformers
+                 , filepath
 
 executable         appianAdmin
     if flag(library-only)

@@ -40,11 +40,11 @@ getLogPath logType tLogFiles = do
     JBoss -> do
       channel <- createLog path tLogFiles
       return (channel, path)
-     where path = "/private/tmp/tmp.txt"
+     where path = "/opt/jboss-eap-6.4/standalone/log/server.log"
     Application -> do
       channel <- createLog path tLogFiles
       return (channel, path)
-     where path = "/private/tmp/tmp1.txt"
+     where path = "/opt/appian/logs/application-server.log"
 
 createLog :: MonadIO m => FilePath -> TLogFileMap ->  m (TChan Text)
 createLog filePath tLogFiles = do
