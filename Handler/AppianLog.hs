@@ -7,22 +7,19 @@ import Control.Concurrent.STM.TChan
 import Control.Concurrent (forkIO, threadDelay)
 import TailFile
 import Data.Monoid ((<>))
-import qualified Data.ByteString.Char8 as C8
 import Data.Aeson (encode)
-
--- getAppianLogR :: AppianLog -> Handler TypedContent
--- getAppianLogR logType = do
---   sendFile (defaultMimeLookup fullPath) $ unpack $ fullPath
---  where
---    fullPath = getLogPath logType
+import qualified Data.Map as M
 
 readTChanIO = atomically . readTChan
 
 getAppianLogR :: AppianLog -> Handler Html
 getAppianLogR logType = do
-  channel <- getChannel
+  -- channels <- getChannels
   --readChan <- atomically $ dupTChan channel
-  webSockets $ chatApp channel
+  tLogFiles <- getLogFilePath
+  (channel, path) <- getLogPath logType tLogFiles
+  readChan <- atomically $ cloneTChan channel
+  webSockets $ chatApp readChan
 
   users <- getNLogUsers
   $(logInfo) $ "Number of log users " ++ pack (show users)
@@ -30,22 +27,47 @@ getAppianLogR logType = do
   case users of
     0 -> do
       $(logInfo) $ "Forking tailFile"
-      liftIO $ forkIO $ tailFile channel tLogUsers "/private/tmp/tmp.txt"
+      liftIO $ forkIO $ tailFile tLogUsers tLogFiles path
       return ()
     n -> return ()
 
   incLogUsers
   defaultLayout $(widgetFile "logfile")
 
-getLogPath :: AppianLog -> Text
-getLogPath JBoss = "/opt/jboss-eap-6.4/standalone/log/server.log"
-getLogPath Application = "/opt/appian/logs/application-server.log"
+getLogPath :: MonadIO m => AppianLog -> TLogFileMap -> m (TChan Text, FilePath)
+getLogPath logType tLogFiles = do
+  case logType of
+    JBoss -> do
+      channel <- createLog path tLogFiles
+      return (channel, path)
+     where path = "/private/tmp/tmp.txt"
+    Application -> do
+      channel <- createLog path tLogFiles
+      return (channel, path)
+     where path = "/private/tmp/tmp1.txt"
 
-chatApp :: TChan AppianLogMessage -> WebSocketsT Handler ()
+createLog :: MonadIO m => FilePath -> TLogFileMap ->  m (TChan Text)
+createLog filePath tLogFiles = do
+  liftIO $ atomically $ do
+         chan <- newTChan
+         modifyTVar tLogFiles $ \logFiles ->
+             M.alter (\mVal ->
+                      case mVal of
+                        Nothing -> Just $ AppianLogMessage chan 0
+                        Just val -> Just val
+                     ) filePath logFiles
+
+         logFiles <- readTVar tLogFiles
+         
+         case M.lookup filePath logFiles of
+           Just (AppianLogMessage rChan _) -> return rChan
+           Nothing -> return chan
+
+chatApp :: TChan Text -> WebSocketsT Handler ()
 chatApp channel = do
   $(logInfo) $ "Attempting to read from channel"
   contents <- liftIO $ readTChanIO channel
-  res <- sendTextDataE $ encode contents
+  res <- sendTextDataE contents
   $(logInfo) $ "Sent " <> pack (show contents) <> " to the websocket."
   case res of
     Right _ -> chatApp channel
@@ -62,4 +84,3 @@ logWatcher channel tLogUsers = do
       atomically $ writeTChan channel ("Logfile updated!" :: ByteString)
       liftIO $ putStrLn "Wrote to the channel!"
       logWatcher channel tLogUsers
-

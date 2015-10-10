@@ -54,8 +54,8 @@ makeFoundation appSettings = do
         (if appMutableStatic appSettings then staticDevel else static)
         (appStaticDir appSettings)
     db <- atomically $ newTVar False
+    emptyLogFileMap <- atomically $ newTVar mempty
 
-    chan <- atomically newTChan
     users <- atomically $ newTVar 0
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a
@@ -69,8 +69,8 @@ makeFoundation appSettings = do
         tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
         logFunc = messageLoggerSource tempFoundation appLogger
         dbLock = db
-        logChannel = chan
         currentLogUsers = users
+        logFiles = emptyLogFileMap
 
     -- Create the database connection pool
     pool <- flip runLoggingT logFunc $ createSqlitePool

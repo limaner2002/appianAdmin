@@ -14,9 +14,9 @@ data AppianLog = JBoss | Application
                deriving Read
 
 data AppianLogMessage = AppianLogMessage
-                      { contents :: Text
+                      { channel :: TChan Text
                       , position :: Integer
-                      } deriving Show
+                      }
 
 instance Show AppianLog where
     show JBoss = "JBoss"
@@ -39,10 +39,10 @@ instance PathPiece AppianLog where
 
     toPathPiece log = pack $ show log
 
-instance ToJSON AppianLogMessage where
-    toJSON (AppianLogMessage contents position) =
-        object ["contents" .= contents, "position" .= position]
+-- instance ToJSON AppianLogMessage where
+--     toJSON (AppianLogMessage contents position) =
+--         object ["contents" .= contents, "position" .= position]
 
-instance Monoid AppianLogMessage where
-    mempty = AppianLogMessage mempty 0
+-- instance Monoid AppianLogMessage where
+--     mempty = AppianLogMessage mempty 0
 

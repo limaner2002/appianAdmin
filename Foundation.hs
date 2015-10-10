@@ -18,6 +18,8 @@ import System.Directory
 type FileName = Text
 type Path = Text
 type FileMap = M.Map FileName Path
+type LogFileMap = M.Map FilePath AppianLogMessage
+type TLogFileMap = STM.TVar LogFileMap
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -30,8 +32,8 @@ data App = App
     , appHttpManager    :: Manager
     , appLogger         :: Logger
     , dbLock            :: STM.TVar Bool
-    , logChannel        :: TChan AppianLogMessage
     , currentLogUsers   :: STM.TVar Int
+    , logFiles          :: TLogFileMap
     }
 
 instance HasHttpManager App where
@@ -201,10 +203,6 @@ deleteFile fileNames = do
 --   runDB action
 --   atomically $ STM.modifyTVar lock $ \_ -> False
 
-getChannel = do
-  app <- getYesod
-  return $ logChannel app
-
 getNLogUsers = do
   mLogUsers <- getLogUsers
   atomically $ STM.readTVar mLogUsers
@@ -227,3 +225,7 @@ decLogUsers = do
                    0 -> 0
                    n -> n - 1
   return ()
+
+getLogFilePath = do
+  app <- getYesod
+  return $ logFiles app

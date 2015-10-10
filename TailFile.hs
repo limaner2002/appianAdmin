@@ -17,51 +17,54 @@ import qualified Data.Map as M
 import Yesod.WebSockets (sendTextData, webSockets, WebSocketsT)
 import Import hiding (atomically, withManager, (<>))
 import Data.Monoid ((<>))
+import Foundation
 
-type PosMap = M.Map FilePath Integer
-type FilePosition = TVar PosMap
+-- type PosMap = M.Map FilePath Integer
+-- type FilePosition = TVar PosMap
 
-initialFilePosition :: IO FilePosition
-initialFilePosition = atomically $ newTVar mempty
+-- initialFilePosition :: IO FilePosition
+-- initialFilePosition = atomically $ newTVar mempty
 
-myAction :: (MonadIO m) => TChan AppianLogMessage -> FilePosition -> Event -> m ()
-myAction _ pos (Added path time) = do
+myAction :: (MonadIO m) => TLogFileMap -> Event -> m ()
+myAction tLogFiles (Added path time) = do
   putStrLn $ "File " <> pack path <> " was added"
-  posMap <- liftIO $ atomically $ readTVar pos
-  case contains path posMap of
-    True -> setPos pos path 0
+  logFiles <- liftIO $ atomically $ readTVar tLogFiles
+  case contains path logFiles of
+    True -> setPos tLogFiles path 0
     False -> return ()
-myAction channel pos (Modified path time) = do
+myAction tLogFiles (Modified path time) = do
   putStrLn $ "File " <> pack path <> " was modified"
-  readDesiredFile channel pos path
-myAction _ pos (Removed path time) = do
+  readDesiredFile tLogFiles path
+myAction _ (Removed path time) = do
   putStrLn $ "File " <> pack path <> " was removed"
   return ()
 
-setPos :: MonadIO m => FilePosition -> FilePath -> Integer -> m ()
-setPos pos filePath newPos =
-    liftIO $ atomically $ modifyTVar pos $ \posMap ->
-        M.insert filePath newPos posMap
+setPos :: MonadIO m => TLogFileMap -> FilePath -> Integer -> m ()
+setPos tLogFiles path newPos =
+    liftIO $ atomically $ modifyTVar tLogFiles $ \logFiles ->
+        M.alter (\mVal ->
+                   case mVal of
+                     Nothing -> Nothing
+                     Just (AppianLogMessage channel _) -> Just $ AppianLogMessage channel newPos
+              ) path logFiles
 
-getPos :: MonadIO m => FilePosition -> FilePath -> m Integer
-getPos tPos filePath = do
-    posMap <- liftIO $ atomically $ readTVar tPos
+getPos :: MonadIO m => TLogFileMap -> FilePath -> m Integer
+getPos tLogFiles filePath = do
+    posMap <- liftIO $ atomically $ readTVar tLogFiles
     case M.lookup filePath posMap of
       Nothing -> return 0
-      Just p -> return p
+      Just (AppianLogMessage _ p) -> return p
 
-tailFile :: MonadIO m => TChan AppianLogMessage -> TVar Int -> FilePath -> m ()
-tailFile channel tLogUsers path = do
-  filePos <- liftIO $ initialFilePosition
-  setPos filePos path 0
+tailFile :: MonadIO m => TVar Int -> TLogFileMap -> FilePath -> m ()
+tailFile tLogUsers tLogFiles path = do
   liftIO $ withManager $ \mgr -> do
-    readDesiredFile channel filePos path
+    readDesiredFile tLogFiles path
     -- start a watching job (in the background)
     watchDir
       mgr          -- manager
       "/tmp/"          -- directory to watch
       (const True) -- predicate
-      (myAction channel filePos)     -- action
+      (myAction tLogFiles)     -- action
     sleep tLogUsers
 
 sleep :: MonadIO m => TVar Int -> m ()
@@ -72,13 +75,13 @@ sleep tLogUsers = do
       0 -> return ()
       n -> sleep tLogUsers
 
-contains :: FilePath -> PosMap -> Bool
+contains :: FilePath -> LogFileMap -> Bool
 contains path posMap =
   case M.lookup path posMap of
     Nothing -> False
     Just _ -> True
 
-readFilePart :: MonadIO m => FilePosition -> FilePath -> m AppianLogMessage
+readFilePart :: MonadIO m => TLogFileMap -> FilePath -> m Text
 readFilePart pos path =
     liftIO $ withBinaryFile path ReadMode $ \handle ->
         sourceHandle handle $$ do
@@ -92,20 +95,26 @@ readFilePart pos path =
           case mContents of
             Nothing -> return mempty
             Just contents -> do
-                           return $ AppianLogMessage contents size
+                           return contents
 
 writeChannel :: (MonadIO m, Show a) => TChan a -> a -> m ()
 writeChannel channel contents = do
   putStrLn $ "Writing " <> pack (show contents) <> " to channel"
   liftIO $ atomically $ writeTChan channel contents
 
-readDesiredFile :: (MonadIO m) => TChan AppianLogMessage -> FilePosition -> FilePath -> m ()
-readDesiredFile channel pos path = do
+readDesiredFile :: (MonadIO m) => TLogFileMap -> FilePath -> m ()
+readDesiredFile tLogFiles path = do
   putStrLn $ "Reading file " <> pack path
-  posMap <- liftIO $ atomically $ readTVar pos
-  putStrLn $ "posMap: " <> pack (show posMap)
-  case contains path posMap of
-    True -> do
-      contents <- readFilePart pos path
+  logFiles <- getPos tLogFiles path
+  putStrLn $ "posMap: " <> pack (show logFiles)
+  res <- atomicLookup path tLogFiles
+  case res of
+    Just (AppianLogMessage channel _) -> do
+      contents <- readFilePart tLogFiles path
       writeChannel channel contents
-    False -> return ()
+    Nothing -> return ()
+
+atomicLookup :: (MonadIO m, Ord k) => k -> TVar (M.Map k a) -> m (Maybe a)
+atomicLookup key tMap = do
+    mp <- liftIO $ atomically $ readTVar tMap
+    return $ M.lookup key mp
