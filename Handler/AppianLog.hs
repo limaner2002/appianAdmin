@@ -14,39 +14,41 @@ readTChanIO = atomically . readTChan
 
 getAppianLogR :: AppianLog -> Handler Html
 getAppianLogR logType = do
-  -- channels <- getChannels
-  --readChan <- atomically $ dupTChan channel
   tLogFiles <- getLogFilePath
   (channel, path) <- getLogPath logType tLogFiles
   readChan <- atomically $ cloneTChan channel
-  webSockets $ chatApp readChan
+  webSockets $ chatApp readChan path
 
-  users <- getNLogUsers
+  users <- getNLogUsers path
   $(logInfo) $ "Number of log users " ++ pack (show users)
-  tLogUsers <- getLogUsers
+  tWatchDirMap <- getLogUsers
   case users of
-    0 -> do
+    Nothing -> do
       $(logInfo) $ "Forking tailFile"
-      liftIO $ forkIO $ tailFile tLogUsers tLogFiles path
+      incLogUsers path
+      liftIO $ forkIO $ tailFile tWatchDirMap tLogFiles path
       return ()
-    n -> return ()
+    n -> incLogUsers path
 
-  incLogUsers
   defaultLayout $(widgetFile "logfile")
 
-getLogPath :: MonadIO m => AppianLog -> TLogFileMap -> m (TChan Text, FilePath)
+getLogPath :: MonadIO m => AppianLog -> TLogFileMap -> m (TChan ChannelMessage, FilePath)
 getLogPath logType tLogFiles = do
   case logType of
     JBoss -> do
       channel <- createLog path tLogFiles
       return (channel, path)
-     where path = "/opt/jboss-eap-6.4/standalone/log/server.log"
+     where
+       -- path = "/opt/jboss-eap-6.4/standalone/log/server.log"
+       path = "/private/tmp/tmp.txt"
     Application -> do
       channel <- createLog path tLogFiles
       return (channel, path)
-     where path = "/opt/appian/logs/application-server.log"
+     where
+       -- path = "/opt/appian/logs/application-server.log"
+       path = "/Users/josh/Desktop/tmp.txt"
 
-createLog :: MonadIO m => FilePath -> TLogFileMap ->  m (TChan Text)
+createLog :: MonadIO m => FilePath -> TLogFileMap ->  m (TChan ChannelMessage)
 createLog filePath tLogFiles = do
   liftIO $ atomically $ do
          chan <- newTChan
@@ -63,24 +65,22 @@ createLog filePath tLogFiles = do
            Just (AppianLogMessage rChan _) -> return rChan
            Nothing -> return chan
 
-chatApp :: TChan Text -> WebSocketsT Handler ()
-chatApp channel = do
+chatApp :: TChan ChannelMessage -> FilePath -> WebSocketsT Handler ()
+chatApp channel path = do
   $(logInfo) $ "Attempting to read from channel"
   contents <- liftIO $ readTChanIO channel
-  res <- sendTextDataE contents
-  $(logInfo) $ "Sent " <> pack (show contents) <> " to the websocket."
+  $(logInfo) $ "Sendend " `mappend` " to the websocket"
+  res <- sendMessage contents
   case res of
-    Right _ -> chatApp channel
-    Left _ -> decLogUsers
+    Right _ -> do
+             $(logInfo) $ "Continuing the loop"
+             chatApp channel path
+    Left _ -> do
+        $(logInfo) $ "Exiting the loop\n"
+             <> "path is " <> pack path
+        decLogUsers path
+        return ()
 
-logWatcher :: TChan ByteString -> TVar Int -> IO ()
-logWatcher channel tLogUsers = do
-  threadDelay 10000000
-
-  users <- atomically $ readTVar tLogUsers
-  case users of
-    0 -> return ()
-    n -> do
-      atomically $ writeTChan channel ("Logfile updated!" :: ByteString)
-      liftIO $ putStrLn "Wrote to the channel!"
-      logWatcher channel tLogUsers
+sendMessage :: ChannelMessage -> WebSocketsT Handler (Either SomeException ())
+sendMessage Ping = sendTextDataE ("Ping" :: Text)
+sendMessage (Data contents) = sendTextDataE contents

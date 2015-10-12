@@ -14,12 +14,15 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 
 import System.Directory
+import System.FilePath
 
 type FileName = Text
 type Path = Text
 type FileMap = M.Map FileName Path
 type LogFileMap = M.Map FilePath AppianLogMessage
 type TLogFileMap = STM.TVar LogFileMap
+type WatchDirMap = M.Map FilePath Int
+type TWatchDirMap = STM.TVar WatchDirMap
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -32,7 +35,7 @@ data App = App
     , appHttpManager    :: Manager
     , appLogger         :: Logger
     , dbLock            :: STM.TVar Bool
-    , currentLogUsers   :: STM.TVar Int
+    , currentLogUsers   :: TWatchDirMap
     , logFiles          :: TLogFileMap
     }
 
@@ -203,27 +206,35 @@ deleteFile fileNames = do
 --   runDB action
 --   atomically $ STM.modifyTVar lock $ \_ -> False
 
-getNLogUsers = do
+getNLogUsers path = do
   mLogUsers <- getLogUsers
-  atomically $ STM.readTVar mLogUsers
+  tWatchDirMap <- atomically $ STM.readTVar mLogUsers
+  return $ M.lookup (takeDirectory path) tWatchDirMap
 
 getLogUsers = do
   app <- getYesod
   return $ currentLogUsers app
 
-incLogUsers = do
-  mLogUsers <- getLogUsers
-  atomically $ STM.modifyTVar mLogUsers $
-             \n -> n + 1
+incLogUsers path = do
+  tWatchDirMap <- getLogUsers
+  atomically $ STM.modifyTVar tWatchDirMap $
+             \watchDirMap ->
+                 insertWith (+) (takeDirectory path) 1 watchDirMap
   return ()
 
-decLogUsers = do
-  mLogUsers <- getLogUsers
-  atomically $ STM.modifyTVar mLogUsers $
-             \logUsers ->
-                 case logUsers of
-                   0 -> 0
-                   n -> n - 1
+decLogUsers path = do
+  $(logInfo) $ "decrementing for path " <> pack path
+  tWatchDirMap <- getLogUsers
+  atomically $ STM.modifyTVar tWatchDirMap $
+             \watchDirMap ->
+                 M.alter (\val ->
+                            case val of
+                              Nothing -> Nothing
+                              Just 1 -> Nothing
+                              Just n -> Just (n-1)
+                       ) (takeDirectory path) watchDirMap
+  watchDirMap <- atomically $ STM.readTVar tWatchDirMap
+  $(logInfo) $ "tWatchDirMap: " <> pack (show watchDirMap)
   return ()
 
 getLogFilePath = do

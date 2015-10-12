@@ -8,14 +8,16 @@ conn = new WebSocket(url);
 output.appendChild(p);
 
 conn.onmessage = function(e) {
-    var lines = e.data.split("\n"),
-        line;
-    for (var i = 0; i < lines.length; i++){
-    	line = lines[i];
-    	if(line.length > 0){
-    	    p.appendChild(document.createTextNode(line));
-    	    p.appendChild(document.createElement("br"));
-    	}
+    if(e.data != "Ping"){
+	var lines = e.data.split("\n"),
+            line;
+	for (var i = 0; i < lines.length; i++){
+    	    line = lines[i];
+    	    if(line.length > 0){
+    		p.appendChild(document.createTextNode(line));
+    		p.appendChild(document.createElement("br"));
+    	    }
+	}
     }
 };
 

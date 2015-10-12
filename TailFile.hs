@@ -14,17 +14,13 @@ import System.IO (withBinaryFile, hFileSize, hSeek, IOMode(..), SeekMode(..))
 import Control.Monad.IO.Class
 import Control.Concurrent.STM
 import qualified Data.Map as M
-import Yesod.WebSockets (sendTextData, webSockets, WebSocketsT)
+import Yesod.WebSockets (sendTextData, sendPingE, webSockets, WebSocketsT)
 import Import hiding (atomically, withManager, (<>))
 import Data.Monoid ((<>))
 import Foundation
-import System.FilePath
+import System.FilePath (takeDirectory)
 
--- type PosMap = M.Map FilePath Integer
--- type FilePosition = TVar PosMap
-
--- initialFilePosition :: IO FilePosition
--- initialFilePosition = atomically $ newTVar mempty
+delay = truncate 30e6
 
 myAction :: (MonadIO m) => TLogFileMap -> Event -> m ()
 myAction tLogFiles (Added path time) = do
@@ -56,7 +52,7 @@ getPos tLogFiles filePath = do
       Nothing -> return 0
       Just (AppianLogMessage _ p) -> return p
 
-tailFile :: MonadIO m => TVar Int -> TLogFileMap -> FilePath -> m ()
+tailFile :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> m ()
 tailFile tLogUsers tLogFiles path = do
   liftIO $ withManager $ \mgr -> do
     readDesiredFile tLogFiles path
@@ -66,15 +62,23 @@ tailFile tLogUsers tLogFiles path = do
       (takeDirectory path)   -- directory to watch
       (const True)           -- predicate
       (myAction tLogFiles)   -- action
-    sleep tLogUsers
+    sleep tLogUsers tLogFiles path
 
-sleep :: MonadIO m => TVar Int -> m ()
-sleep tLogUsers = do
-    liftIO $ threadDelay 1000000
-    users <- liftIO $ atomically $ readTVar tLogUsers
-    case users of
-      0 -> return ()
-      n -> sleep tLogUsers
+sleep :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> m ()
+sleep tWatchDirMap tLogFileMap path = do
+  let pathDir = takeDirectory path
+  liftIO $ threadDelay delay
+  watchDirMap <- liftIO $ atomically $ readTVar tWatchDirMap
+  liftIO $ putStrLn $ "watchDirMap: " <> pack (show watchDirMap)
+  case lookup pathDir watchDirMap of
+    Nothing -> do
+        putStrLn $ "No longer watching " <> pack pathDir
+        return ()
+    Just _ -> do
+      channel <- getChannel path tLogFileMap
+      putStrLn $ "Pinging channel for directory " <> pack pathDir
+      writeChannel channel $ Ping
+      sleep tWatchDirMap tLogFileMap path
 
 contains :: FilePath -> LogFileMap -> Bool
 contains path posMap =
@@ -103,16 +107,24 @@ writeChannel channel contents = do
   putStrLn $ "Writing " <> pack (show contents) <> " to channel"
   liftIO $ atomically $ writeTChan channel contents
 
+getChannel :: MonadIO m => FilePath -> TLogFileMap -> m (TChan ChannelMessage)
+getChannel path tLogFileMap = do
+  logFileMap <- liftIO $ atomically $ readTVar tLogFileMap
+  case lookup path logFileMap of
+    Nothing -> error $ "No channel for file " `mappend` path
+    Just (AppianLogMessage chan _) -> return chan
+
 readDesiredFile :: (MonadIO m) => TLogFileMap -> FilePath -> m ()
 readDesiredFile tLogFiles path = do
   putStrLn $ "Reading file " <> pack path
-  logFiles <- getPos tLogFiles path
+  logFiles <- liftIO $ atomically $ readTVar tLogFiles
   putStrLn $ "posMap: " <> pack (show logFiles)
   res <- atomicLookup path tLogFiles
+  putStrLn $ "Result: " <> pack (show res)
   case res of
     Just (AppianLogMessage channel _) -> do
       contents <- readFilePart tLogFiles path
-      writeChannel channel contents
+      writeChannel channel $ Data contents
     Nothing -> return ()
 
 atomicLookup :: (MonadIO m, Ord k) => k -> TVar (M.Map k a) -> m (Maybe a)

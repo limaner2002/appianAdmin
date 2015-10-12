@@ -13,10 +13,19 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"]
 data AppianLog = JBoss | Application
                deriving Read
 
+data ChannelMessage = Ping | Data Text
+
 data AppianLogMessage = AppianLogMessage
-                      { channel :: TChan Text
+                      { channel :: TChan ChannelMessage
                       , position :: Integer
                       }
+
+instance Show AppianLogMessage where
+    show (AppianLogMessage _ position) = show position
+
+instance Show ChannelMessage where
+    show Ping = "Ping"
+    show (Data txt) = "Data:\n" <> unpack txt
 
 instance Show AppianLog where
     show JBoss = "JBoss"
