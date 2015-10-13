@@ -15,7 +15,6 @@ $else
                            <tr>
                              <td>#{file}
                              <td><input id="#{idx}" type="checkbox" name="checkbox" value="#{file}" :showVal id val:checked>
-                           <br>
     <button .btn .btn-dange type="submit" value="delete" name="action">
       Delete
 

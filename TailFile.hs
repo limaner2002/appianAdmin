@@ -60,8 +60,8 @@ getPos tLogFiles filePath = do
 
 tailFile :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> TailConf -> m ()
 tailFile tLogUsers tLogFiles path tailConf = do
-  
-  liftIO $ withManager $ \mgr -> do
+  let conf = defaultConfig {confUsePolling = True}
+  liftIO $ withManagerConf conf $ \mgr -> do
     readDesiredFile tLogFiles path tailConf
     -- start a watching job (in the background)
     watchDir
@@ -145,7 +145,7 @@ readDesiredFile tLogFiles path tailConf = do
             else liftIO $ hSeek handle AbsoluteSeek previousPos
 
           liftIO $ setPos tLogFiles path size
-
+--          liftIO $ putStrLn $ "
           runTail (sourceHandle handle $$ 
                        writeChannel) tailConf
     Nothing -> return ()
@@ -157,11 +157,3 @@ atomicLookup key tMap = do
 
 runTail = evalStateT
 
-myLogger :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
-myLogger _ _ LevelInfo msg = do
-  -- curTime <- getCurrentTime
-  -- timeZone <- getCurrentTimeZone
-  -- let localTime = utcToLocalTime timeZone curTime
-  -- putStrLn $ show localTime ++ ": " ++ (C8.unpack $ fromLogStr msg)
-  putStrLn $ pack (C8.unpack $ fromLogStr msg)
-myLogger _ _ _ _ = return ()
