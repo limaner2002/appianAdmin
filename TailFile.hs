@@ -4,35 +4,41 @@ module TailFile where
 {-# LANGUAGE FlexibleContexts #-}
 import System.FSNotify
 import Control.Concurrent (threadDelay)
-import Control.Monad (forever)
 import Data.Conduit
---import Data.Conduit.Binary (sourceHandle)
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.Text as T
 import System.IO (withBinaryFile, hFileSize, hSeek, IOMode(..), SeekMode(..))
 import Control.Monad.IO.Class
 import Control.Concurrent.STM
 import qualified Data.Map as M
-import Yesod.WebSockets (sendTextData, sendPingE, webSockets, WebSocketsT)
 import Import hiding (atomically, withManager, (<>))
 import Data.Monoid ((<>))
-import Foundation
 import System.FilePath (takeDirectory)
+import Control.Monad.Logger
+import Control.Monad.State
+import System.Log.FastLogger (fromLogStr)
+import qualified Data.ByteString.Char8 as C8
 
+type TailFileM = StateT TailConf IO
+data TailConf = TailConf
+              { tailTLogUsers :: TWatchDirMap
+              , tailTLogFiles :: TLogFileMap
+              , tailCurrentPath :: FilePath
+              , tailTChan :: TChan ChannelMessage
+              }
+
+delay :: Int
 delay = truncate 30e6
 
-myAction :: (MonadIO m) => TLogFileMap -> Event -> m ()
-myAction tLogFiles (Added path time) = do
+myAction :: (MonadIO m) => TLogFileMap -> TailConf -> Event -> m ()
+myAction tLogFiles _ (Added path time) = do
   putStrLn $ "File " <> pack path <> " was added"
   logFiles <- liftIO $ atomically $ readTVar tLogFiles
   case contains path logFiles of
     True -> setPos tLogFiles path 0
     False -> return ()
-myAction tLogFiles (Modified path time) = do
+myAction tLogFiles tailConf (Modified path time) = do
   putStrLn $ "File " <> pack path <> " was modified"
-  readDesiredFile tLogFiles path
-myAction _ (Removed path time) = do
+  readDesiredFile tLogFiles path tailConf
+myAction _ _ (Removed path time) = do
   putStrLn $ "File " <> pack path <> " was removed"
   return ()
 
@@ -52,20 +58,21 @@ getPos tLogFiles filePath = do
       Nothing -> return 0
       Just (AppianLogMessage _ p) -> return p
 
-tailFile :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> m ()
-tailFile tLogUsers tLogFiles path = do
+tailFile :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> TailConf -> m ()
+tailFile tLogUsers tLogFiles path tailConf = do
+  
   liftIO $ withManager $ \mgr -> do
-    readDesiredFile tLogFiles path
+    readDesiredFile tLogFiles path tailConf
     -- start a watching job (in the background)
     watchDir
       mgr                    -- manager
       (takeDirectory path)   -- directory to watch
       (const True)           -- predicate
-      (myAction tLogFiles)   -- action
-    sleep tLogUsers tLogFiles path
+      (myAction tLogFiles tailConf)   -- action
+    sleep tLogUsers tLogFiles path tailConf
 
-sleep :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> m ()
-sleep tWatchDirMap tLogFileMap path = do
+sleep :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> TailConf -> m ()
+sleep tWatchDirMap tLogFileMap path tailConf = do
   let pathDir = takeDirectory path
   liftIO $ threadDelay delay
   watchDirMap <- liftIO $ atomically $ readTVar tWatchDirMap
@@ -77,8 +84,8 @@ sleep tWatchDirMap tLogFileMap path = do
     Just _ -> do
       channel <- getChannel path tLogFileMap
       putStrLn $ "Pinging channel for directory " <> pack pathDir
-      writeChannel channel $ Ping
-      sleep tWatchDirMap tLogFileMap path
+      liftIO $ runTail (pingSource $$ writeChannel) tailConf
+      sleep tWatchDirMap tLogFileMap path tailConf
 
 contains :: FilePath -> LogFileMap -> Bool
 contains path posMap =
@@ -86,26 +93,33 @@ contains path posMap =
     Nothing -> False
     Just _ -> True
 
-readFilePart :: MonadIO m => TLogFileMap -> FilePath -> m Text
-readFilePart pos path =
-    liftIO $ withBinaryFile path ReadMode $ \handle ->
-        sourceHandle handle $$ do
-          liftIO $ putStrLn "Reading file now"
-          previousPos <- liftIO $ getPos pos path
-          size <- liftIO $ hFileSize handle
-          liftIO $ hSeek handle AbsoluteSeek previousPos
-          mContents <- await
-          liftIO $ setPos pos path size
-          print mContents
-          case mContents of
-            Nothing -> return mempty
-            Just contents -> do
-                           return contents
+-- readFilePart :: (MonadIO m, MonadResource m) => Conduit Text m Text
+-- readFilePart = do
+--   mContents <- await
+--   case mContents of
+--     Nothing -> return mempty
+--     Just contents -> do
+--                    yield contents
+--                    readFilePart
 
-writeChannel :: (MonadIO m, Show a) => TChan a -> a -> m ()
-writeChannel channel contents = do
-  putStrLn $ "Writing " <> pack (show contents) <> " to channel"
-  liftIO $ atomically $ writeTChan channel contents
+-- writeChannel :: (MonadIO m, Show a) => TChan a -> a -> m ()
+-- writeChannel channel contents = do
+--   liftIO $ atomically $ writeTChan channel contents
+
+pingSource :: MonadIO m => Producer m Text
+pingSource =
+    yield "Ping"
+
+writeChannel :: Consumer Text TailFileM ()
+writeChannel = do
+  mContents <- await
+  case mContents of
+    Nothing -> return ()
+    Just contents -> do
+                   channel <- gets tailTChan
+                   liftIO $ atomically $ writeTChan channel $ Data contents
+                   --liftIO $ print contents
+                   writeChannel
 
 getChannel :: MonadIO m => FilePath -> TLogFileMap -> m (TChan ChannelMessage)
 getChannel path tLogFileMap = do
@@ -114,8 +128,8 @@ getChannel path tLogFileMap = do
     Nothing -> error $ "No channel for file " `mappend` path
     Just (AppianLogMessage chan _) -> return chan
 
-readDesiredFile :: (MonadIO m) => TLogFileMap -> FilePath -> m ()
-readDesiredFile tLogFiles path = do
+readDesiredFile :: (MonadIO m) => TLogFileMap -> FilePath -> TailConf -> m ()
+readDesiredFile tLogFiles path tailConf = do
   putStrLn $ "Reading file " <> pack path
   logFiles <- liftIO $ atomically $ readTVar tLogFiles
   putStrLn $ "posMap: " <> pack (show logFiles)
@@ -123,11 +137,31 @@ readDesiredFile tLogFiles path = do
   putStrLn $ "Result: " <> pack (show res)
   case res of
     Just (AppianLogMessage channel _) -> do
-      contents <- readFilePart tLogFiles path
-      writeChannel channel $ Data contents
+      liftIO $ withBinaryFile path ReadMode $ \handle -> do
+          previousPos <- liftIO $ getPos tLogFiles path
+          size <- liftIO $ hFileSize handle
+          if size < previousPos
+            then liftIO $ hSeek handle AbsoluteSeek 0
+            else liftIO $ hSeek handle AbsoluteSeek previousPos
+
+          liftIO $ setPos tLogFiles path size
+
+          runTail (sourceHandle handle $$ 
+                       writeChannel) tailConf
     Nothing -> return ()
 
 atomicLookup :: (MonadIO m, Ord k) => k -> TVar (M.Map k a) -> m (Maybe a)
 atomicLookup key tMap = do
     mp <- liftIO $ atomically $ readTVar tMap
     return $ M.lookup key mp
+
+runTail = evalStateT
+
+myLogger :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+myLogger _ _ LevelInfo msg = do
+  -- curTime <- getCurrentTime
+  -- timeZone <- getCurrentTimeZone
+  -- let localTime = utcToLocalTime timeZone curTime
+  -- putStrLn $ show localTime ++ ": " ++ (C8.unpack $ fromLogStr msg)
+  putStrLn $ pack (C8.unpack $ fromLogStr msg)
+myLogger _ _ _ _ = return ()

@@ -22,11 +22,17 @@ getAppianLogR logType = do
   users <- getNLogUsers path
   $(logInfo) $ "Number of log users " ++ pack (show users)
   tWatchDirMap <- getLogUsers
+  let tailConf = TailConf
+                 { tailTLogUsers = tWatchDirMap
+                 , tailTLogFiles = tLogFiles
+                 , tailCurrentPath = path
+                 , tailTChan = channel
+                 }
   case users of
     Nothing -> do
       $(logInfo) $ "Forking tailFile"
       incLogUsers path
-      liftIO $ forkIO $ tailFile tWatchDirMap tLogFiles path
+      liftIO $ forkIO $ tailFile tWatchDirMap tLogFiles path tailConf
       return ()
     n -> incLogUsers path
 
@@ -69,7 +75,6 @@ chatApp :: TChan ChannelMessage -> FilePath -> WebSocketsT Handler ()
 chatApp channel path = do
   $(logInfo) $ "Attempting to read from channel"
   contents <- liftIO $ readTChanIO channel
-  $(logInfo) $ "Sendend " `mappend` " to the websocket"
   res <- sendMessage contents
   case res of
     Right _ -> do

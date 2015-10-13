@@ -93,6 +93,7 @@ library
                  , conduit-extra
                  , transformers
                  , filepath
+                 , mtl
 
 executable         appianAdmin
     if flag(library-only)
