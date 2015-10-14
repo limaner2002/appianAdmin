@@ -87,5 +87,6 @@ chatApp channel path = do
         return ()
 
 sendMessage :: ChannelMessage -> WebSocketsT Handler (Either SomeException ())
-sendMessage Ping = sendTextDataE ("Ping" :: Text)
-sendMessage (Data contents) = sendTextDataE contents
+-- sendMessage Ping = sendTextDataE ("Ping" :: Text)
+-- sendMessage (Data contents) = sendTextDataE contents
+sendMessage msg = sendTextDataE $ encode msg

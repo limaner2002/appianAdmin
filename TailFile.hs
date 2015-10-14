@@ -28,6 +28,9 @@ data TailConf = TailConf
 delay :: Int
 delay = truncate 30e6
 
+pollInterval :: Int
+pollInterval = truncate 5e6
+
 myAction :: (MonadIO m) => TLogFileMap -> TailConf -> Event -> m ()
 myAction tLogFiles _ (Added path time) = do
   putStrLn $ "File " <> pack path <> " was added"
@@ -60,7 +63,9 @@ getPos tLogFiles filePath = do
 
 tailFile :: MonadIO m => TWatchDirMap -> TLogFileMap -> FilePath -> TailConf -> m ()
 tailFile tLogUsers tLogFiles path tailConf = do
-  let conf = defaultConfig {confUsePolling = True}
+  let conf = defaultConfig { confUsePolling = True
+                           , confPollInterval = pollInterval
+                           }
   liftIO $ withManagerConf conf $ \mgr -> do
     readDesiredFile tLogFiles path tailConf
     -- start a watching job (in the background)
@@ -93,31 +98,27 @@ contains path posMap =
     Nothing -> False
     Just _ -> True
 
--- readFilePart :: (MonadIO m, MonadResource m) => Conduit Text m Text
--- readFilePart = do
---   mContents <- await
---   case mContents of
---     Nothing -> return mempty
---     Just contents -> do
---                    yield contents
---                    readFilePart
+readFilePart :: MonadIO m => Conduit Text m ChannelMessage
+readFilePart = do
+  mContents <- await
+  case mContents of
+    Nothing -> return ()
+    Just contents -> do
+                   yield $ Data contents
+                   readFilePart
 
--- writeChannel :: (MonadIO m, Show a) => TChan a -> a -> m ()
--- writeChannel channel contents = do
---   liftIO $ atomically $ writeTChan channel contents
-
-pingSource :: MonadIO m => Producer m Text
+pingSource :: MonadIO m => Producer m ChannelMessage
 pingSource =
-    yield "Ping"
+    yield Ping
 
-writeChannel :: Consumer Text TailFileM ()
+writeChannel :: Consumer ChannelMessage TailFileM ()
 writeChannel = do
   mContents <- await
   case mContents of
     Nothing -> return ()
     Just contents -> do
                    channel <- gets tailTChan
-                   liftIO $ atomically $ writeTChan channel $ Data contents
+                   liftIO $ atomically $ writeTChan channel contents
                    --liftIO $ print contents
                    writeChannel
 
@@ -127,6 +128,14 @@ getChannel path tLogFileMap = do
   case lookup path logFileMap of
     Nothing -> error $ "No channel for file " `mappend` path
     Just (AppianLogMessage chan _) -> return chan
+
+resetChannel :: MonadIO m => FilePath -> TLogFileMap -> m ()
+resetChannel path tLogFileMap = do
+  oldChan <- getChannel path tLogFileMap
+  liftIO $ atomically $ do
+         dChan <- dupTChan oldChan
+         modifyTVar tLogFileMap $ \logFileMap ->
+           M.insert path (AppianLogMessage dChan 0) logFileMap
 
 readDesiredFile :: (MonadIO m) => TLogFileMap -> FilePath -> TailConf -> m ()
 readDesiredFile tLogFiles path tailConf = do
@@ -141,13 +150,15 @@ readDesiredFile tLogFiles path tailConf = do
           previousPos <- liftIO $ getPos tLogFiles path
           size <- liftIO $ hFileSize handle
           if size < previousPos
-            then liftIO $ hSeek handle AbsoluteSeek 0
+            then do
+              liftIO $ hSeek handle AbsoluteSeek 0
+              resetChannel path tLogFiles
             else liftIO $ hSeek handle AbsoluteSeek previousPos
 
           liftIO $ setPos tLogFiles path size
 --          liftIO $ putStrLn $ "
-          runTail (sourceHandle handle $$ 
-                       writeChannel) tailConf
+          runTail (sourceHandle handle $$ readFilePart
+                       $= writeChannel) tailConf
     Nothing -> return ()
 
 atomicLookup :: (MonadIO m, Ord k) => k -> TVar (M.Map k a) -> m (Maybe a)

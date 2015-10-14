@@ -8,8 +8,9 @@ conn = new WebSocket(url);
 output.appendChild(p);
 
 conn.onmessage = function(e) {
-    if(e.data != "Ping"){
-	var lines = e.data.split("\n"),
+    var msg = JSON.parse(e.data)
+    if(msg.type == "Data"){
+	var lines = msg.contents.split("\n"),
             line;
 	for (var i = 0; i < lines.length; i++){
     	    line = lines[i];
