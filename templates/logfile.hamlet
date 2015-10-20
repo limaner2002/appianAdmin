@@ -1,7 +1,2 @@
-$case logType
-      $of JBoss
-           <h1>JBoss
-      $of Application
-          <h1>Application Server
 <div #output>
      <p #log>
