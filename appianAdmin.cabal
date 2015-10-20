@@ -23,6 +23,7 @@ library
                      Handler.Common
                      Handler.Home
                      Handler.AppianLog
+                     Handler.Plugins
                      TailFile
 
     if flag(dev) || flag(library-only)

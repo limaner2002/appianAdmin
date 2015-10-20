@@ -1,32 +1,13 @@
-<h1>Appian Plugins
+<div class="navbar">
+     <ul class="nav nav-tabs" id="mainNav">
+         <li class="active" uri=@{PluginsR}>
+             <a href="#">
+                Plugins
+         <li uri=@{AppianLogR JBoss}>
+             <a href="#">
+                JBoss Log
+         <li uri=@{AppianLogR Application}>
+             <a href="#">
+                Application Server Log
 
-$if null fileList
-  <p> No plugins installed
-$else
-  <h2>Submitted plugins
-  <form method=post action=@{HomeR} enctype=#{formEnctype}>
-    <!-- ^{tableWidget} -->
-    <table class="table table-striped">
-      <thead>
-        <th>File Name
-        <th>
-      <tbody>
-        $forall (file, idx) <- files
-                           <tr>
-                             <td>#{file}
-                             <td><input id="#{idx}" type="checkbox" name="checkbox" value="#{file}" :showVal id val:checked>
-    <button .btn .btn-dange type="submit" value="delete" name="action">
-      Delete
-
-<form method=post action=@{HomeR}#form enctype=#{formEnctype}>
-    ^{formWidget}
-  <button .btn .btn-primary type="submit" value="upload" name="action">
-     Send it! <span class="glyphicon glyphicon-upload"></span>
-
-<h1>Appian Logs
-
-<a href=@{AppianLogR JBoss}>
-  JBoss
-<br>
-<a href=@{AppianLogR Application}>
-  Application Server
+<div class="container" id="content">

@@ -14,28 +14,7 @@ readTChanIO = atomically . readTChan
 
 getAppianLogR :: AppianLog -> Handler Html
 getAppianLogR logType = do
-  tLogFiles <- getLogFilePath
-  (channel, path) <- getLogPath logType tLogFiles
-  readChan <- atomically $ cloneTChan channel
-  webSockets $ chatApp readChan path
-
-  users <- getNLogUsers path
-  $(logInfo) $ "Number of log users " ++ pack (show users)
-  tWatchDirMap <- getLogUsers
-  let tailConf = TailConf
-                 { tailTLogUsers = tWatchDirMap
-                 , tailTLogFiles = tLogFiles
-                 , tailCurrentPath = path
-                 , tailTChan = channel
-                 }
-  case users of
-    Nothing -> do
-      $(logInfo) $ "Forking tailFile"
-      incLogUsers path
-      liftIO $ forkIO $ tailFile tWatchDirMap tLogFiles path tailConf
-      return ()
-    n -> incLogUsers path
-
+  webSockets $ socketLauncher logType
   defaultLayout $(widgetFile "logfile")
 
 getLogPath :: MonadIO m => AppianLog -> TLogFileMap -> m (TChan ChannelMessage, FilePath)
@@ -71,20 +50,52 @@ createLog filePath tLogFiles = do
            Just (AppianLogMessage rChan _) -> return rChan
            Nothing -> return chan
 
-chatApp :: TChan ChannelMessage -> FilePath -> WebSocketsT Handler ()
-chatApp channel path = do
+socketLauncher :: AppianLog -> WebSocketsT Handler ()
+socketLauncher logType = do
+  tLogFiles <- getLogFilePath
+  (channel, path) <- getLogPath logType tLogFiles
+  readChan <- atomically $ cloneTChan channel
+  $(logInfo) $ "Launching fileWatcher"
+  fileWatcher logType
+  channelReader readChan path
+
+channelReader :: TChan ChannelMessage -> FilePath -> WebSocketsT Handler ()
+channelReader channel path = do
   $(logInfo) $ "Attempting to read from channel"
   contents <- liftIO $ readTChanIO channel
   res <- sendMessage contents
   case res of
     Right _ -> do
              $(logInfo) $ "Continuing the loop"
-             chatApp channel path
+             channelReader channel path
     Left _ -> do
         $(logInfo) $ "Exiting the loop\n"
              <> "path is " <> pack path
         decLogUsers path
         return ()
+
+fileWatcher :: AppianLog -> WebSocketsT Handler ()
+fileWatcher logType = do
+  tLogFiles <- getLogFilePath
+  (channel, path) <- getLogPath logType tLogFiles
+  readChan <- atomically $ cloneTChan channel
+
+  users <- getNLogUsers path
+  $(logInfo) $ "Number of log users " ++ pack (show users)
+  tWatchDirMap <- getLogUsers
+  let tailConf = TailConf
+                 { tailTLogUsers = tWatchDirMap
+                 , tailTLogFiles = tLogFiles
+                 , tailCurrentPath = path
+                 , tailTChan = channel
+                 }
+  case users of
+    Nothing -> do
+      $(logInfo) $ "Forking tailFile"
+      liftIO $ forkIO $ tailFile tWatchDirMap tLogFiles path tailConf
+      return ()
+    n -> return ()
+  incLogUsers path
 
 sendMessage :: ChannelMessage -> WebSocketsT Handler (Either SomeException ())
 -- sendMessage Ping = sendTextDataE ("Ping" :: Text)
