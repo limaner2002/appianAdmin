@@ -37,13 +37,14 @@ postPluginsR = do
     (FormFailure _, Just "delete") -> do
                 app <- getYesod
                 deleteFile checked
-                redirect PluginsR
+                redirect HomeR
     (FormSuccess fi, Just "upload") -> do
                 app <- getYesod
                 let filePath = T.concat ["/opt/appian/_admin/plugins/", fName]
                     fName = fileName fi
                 runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
                 addFile (Plugin fName filePath)
+                redirect HomeR
     _ -> return ()
 
   fileList <- getList

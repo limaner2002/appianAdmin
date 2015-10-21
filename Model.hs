@@ -3,6 +3,10 @@ module Model where
 import ClassyPrelude.Yesod
 import Database.Persist.Quasi
 
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
+import qualified Text.Blaze.Html.Renderer.Text as R
+
 -- You can define all of your database entities in the entities file.
 -- You can find more information on persistent and how to declare entities
 -- at:
@@ -52,6 +56,24 @@ instance ToJSON ChannelMessage where
     toJSON Ping = object ["type" .= ("Ping" :: Text)]
     toJSON (Data contents) =
         object ["type" .= ("Data" :: Text), "contents" .= contents]
+
+-- data Tab a = Tab a
+
+-- instance H.ToMarkup a => H.ToMarkup (Tab a) where
+--     toMarkup (Tab val) = H.toMarkup $ H.li $ (H.a label) H.! A.href "#"
+--         where
+--           label = H.toHtml val
+
+-- data NavTabs a = NavTabs [Tab a]
+
+-- instance H.ToMarkup a => H.ToMarkup (NavTabs a) where
+--     toMarkup (NavTabs tabs) = (H.ul items) H.! A.class_ "nav nav-tabs"
+--         where
+--           items = fold mappend mempty markups
+--           markups = map H.toMarkup tabs
+
+-- navFromList :: H.ToMarkup a => [a] -> NavTabs a
+-- navFromList = NavTabs . fmap Tab
 
 -- instance ToJSON AppianLogMessage where
 --     toJSON (AppianLogMessage contents position) =

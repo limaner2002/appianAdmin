@@ -95,6 +95,7 @@ library
                  , transformers
                  , filepath
                  , mtl
+                 , blaze-html
 
 executable         appianAdmin
     if flag(library-only)
