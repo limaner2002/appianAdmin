@@ -13,7 +13,7 @@ $else
                            <tr>
                              <td>#{file}
                              <td><input id="#{idx}" type="checkbox" name="checkbox" value="#{file}" :showVal id val:checked>
-    <button .btn .btn-dange type="submit" value="delete" name="action">
+    <button .btn .btn-danger .pull-right type="submit" value="delete" name="action">
       Delete
 
 <form method=post action=@{PluginsR}#form enctype=#{formEnctype}>

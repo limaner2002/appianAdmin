@@ -40,12 +40,14 @@ postPluginsR = do
                 redirect HomeR
     (FormSuccess fi, Just "upload") -> do
                 app <- getYesod
-                let filePath = T.concat ["/opt/appian/_admin/plugins/", fName]
+                let filePath = T.concat [appianPluginPath, fName]
                     fName = fileName fi
                 runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
                 addFile (Plugin fName filePath)
                 redirect HomeR
-    _ -> return ()
+    (FormFailure msg, _) -> do
+                          $(logInfo) $ T.concat msg
+                          return ()
 
   fileList <- getList
   let files = zip (map pluginFileName fileList) ([1..] :: [Int])
@@ -62,3 +64,5 @@ fileTable = mempty
   <> Table.text "File Name" fst
   <> Table.text "File Path" snd
 
+--pluginPath = "/opt/appian/_admin/plugins/"
+appianPluginPath = "/tmp/"
