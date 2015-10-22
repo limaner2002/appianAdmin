@@ -1,6 +1,7 @@
 var nav = document.getElementById("mainNav"),
     tabs = nav.getElementsByTagName("li"),
     main = document.getElementById("content"),
+    button = document.getElementById("clearLog"),
     conn;
 
 function navClicked(tabs, idx){
@@ -42,6 +43,7 @@ function httpGetAsync(theUrl, callback, idx){
 	    if(idx == 1 || idx == 2){
 		logListen(tabs[idx].getAttribute("uri"));
 	    }
+	    setClearListener(idx);
 	}
     }
     xmlHttp.open("GET", theUrl, true); // true for asynchronous
@@ -76,4 +78,22 @@ function logListen(uri){
     };
 }
 
-navClicked(tabs, 0);
+navClicked(tabs, #{rawJS $ show navIdx});
+
+function setClearListener(idx){
+    var button = document.getElementById("clearLog"),
+	logOutput = document.createElement("div");
+
+    console.log("button is " + button);
+    if(button != null){
+	button.onclick = function() {
+	    console.log("logOutput: " + logOutput);
+	    console.log("children: " + logOutput.childNodes[0]);
+	    while(logOutput.lastChild){
+		logOutput.removeChild(logOutput.lastChild);
+		console.log("removed last child");
+	    }
+	    console.log("Clicked?");
+	}
+    }
+}

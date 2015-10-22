@@ -37,14 +37,14 @@ postPluginsR = do
     (FormFailure _, Just "delete") -> do
                 app <- getYesod
                 deleteFile checked
-                redirect HomeR
+                redirect $ HomeR
     (FormSuccess fi, Just "upload") -> do
                 app <- getYesod
                 let filePath = T.concat [appianPluginPath, fName]
                     fName = fileName fi
                 runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
                 addFile (Plugin fName filePath)
-                redirect HomeR
+                redirect $ HomeR
     (FormFailure msg, _) -> do
                           $(logInfo) $ T.concat msg
                           return ()

@@ -7,3 +7,5 @@
 / HomeR GET
 /appianLog/#AppianLog AppianLogR GET
 /plugins PluginsR GET POST
+/clearLog/#AppianLog ClearLogR GET
+/navPos/#Int NavPosR GET
