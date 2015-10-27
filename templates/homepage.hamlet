@@ -1,13 +1,1 @@
-<div class="navbar">
-     <ul class="nav nav-tabs" id="mainNav">
-         <li class="active" uri=@{PluginsR}>
-             <a href="#">
-                Plugins
-         <li uri=@{AppianLogR JBoss}>
-             <a href="#">
-                JBoss Log
-         <li uri=@{AppianLogR Application}>
-             <a href="#">
-                Application Server Log
-
 <div class="container" id="content">

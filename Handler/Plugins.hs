@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Handler.Plugins where
 
 import qualified Data.Text as T
@@ -10,59 +12,87 @@ import Yesod.Table (Table)
 import qualified Yesod.Table as Table
 import Data.Monoid
 import qualified Data.Map as M
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
+import Text.Julius (rawJS)
+import Network.Mime (defaultMimeLookup)
 
 -- This is a handler function for the GET request method on the HomeR
 -- resource pattern. All of your resource patterns are defined in
 -- config/routes
---
--- The majority of the code you will write in Yesod lives in these handler
--- functions. You can spread them across multiple files if you are so
--- inclined, or create a single monolithic file.
 getPluginsR :: Handler Html
 getPluginsR = do
-  (formWidget, formEnctype) <- generateFormPost sampleForm
-  fileList <- getList
-  let files = zip (map pluginFileName fileList) ([1..] :: [Int])
-  defaultLayout $ do
-             aDomId <- newIdent
-             setTitle "Appian Plugins"
-             $(widgetFile "plugins")
+  form <- generateFormPost sampleForm
+  let navIdx = 0
+  renderPage form
 
 postPluginsR :: Handler Html
 postPluginsR = do
   ((result, formWidget), formEnctype) <- runFormPost sampleForm
   action <- lookupPostParam "action"
   checked <- lookupPostParams "checkbox"
+  let navIdx = 0
   case (result, action) of
     (FormFailure _, Just "delete") -> do
                 app <- getYesod
                 deleteFile checked
-                redirect $ HomeR
     (FormSuccess fi, Just "upload") -> do
                 app <- getYesod
                 let filePath = T.concat [appianPluginPath, fName]
                     fName = fileName fi
                 runResourceT $ fileSource fi $$ sinkFile (T.unpack filePath)
                 addFile (Plugin fName filePath)
-                redirect $ HomeR
     (FormFailure msg, _) -> do
                           $(logInfo) $ T.concat msg
-                          return ()
 
-  fileList <- getList
-  let files = zip (map pluginFileName fileList) ([1..] :: [Int])
-  defaultLayout $ do
-             aDomId <- newIdent
-             setTitle "Appian Plugins"
-             $(widgetFile "plugins")
+  renderPage (formWidget, formEnctype)
 
 sampleForm :: Form FileInfo
-sampleForm = renderBootstrap3 BootstrapBasicForm $ fileAFormReq "Plugin File"
+sampleForm = renderBootstrap3 BootstrapBasicForm $
+               areq field "Plugin Jar File" Nothing 
+    where
+      field = check checkExtension fileField
 
-fileTable :: Table App (T.Text, T.Text)
+checkExtension :: FileInfo -> Either Text FileInfo
+checkExtension fi
+    | T.takeEnd 4 fName == ".jar" = Right fi
+    | otherwise = Left msg
+  where
+    fName = fileName fi
+    msg = toMessage ("Please only upload .jar files" :: Text)
+
+data Checkbox = Checkbox Html
+
+boxWidget (Checkbox html) = toWidget html
+
+checkbox :: Text -> Checkbox
+checkbox = Checkbox . (H.!) (H.input H.! type_ H.! name) . A.value . H.toValue
+    where
+      type_ = A.type_ "checkbox"
+      name = A.name "checkbox"
+
+data Row = Row
+    { rowName :: T.Text
+    , box :: Checkbox
+    }
+
+fileTable :: Table App Row
 fileTable = mempty
-  <> Table.text "File Name" fst
-  <> Table.text "File Path" snd
+  <> Table.text "File Name" rowName
+  <> Table.widget mempty (boxWidget . box)
 
 --pluginPath = "/opt/appian/_admin/plugins/"
 appianPluginPath = "/tmp/"
+
+renderPage :: ToWidget App xml => (xml, Enctype) -> Handler Html
+renderPage (formWidget, formEnctype) = do
+  fileList <- getList
+  let files = zip (map pluginFileName fileList) ([1..] :: [Int])
+      fileNames = map pluginFileName fileList
+      rows = map (\fileName -> Row fileName $ checkbox fileName) fileNames
+  defaultLayout $ do
+             let tableWidget = Table.buildBootstrap fileTable rows
+                 navIdx = 0
+             aDomId <- newIdent
+             setTitle "Appian Plugins"
+             $(widgetFile "plugins")

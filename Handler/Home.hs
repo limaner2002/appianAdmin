@@ -3,4 +3,4 @@ module Handler.Home where
 import Import
 
 getHomeR :: Handler Html
-getHomeR = redirect $ NavPosR 0
+getHomeR = redirect $ PluginsR

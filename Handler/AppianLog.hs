@@ -1,7 +1,6 @@
 module Handler.AppianLog where
 
 import Import hiding ((<>))
-import Network.Mime (defaultMimeLookup)
 import Yesod.WebSockets
 import Control.Concurrent.STM.TChan
 import Control.Concurrent (forkIO, threadDelay)
@@ -9,12 +8,16 @@ import TailFile
 import Data.Monoid ((<>))
 import Data.Aeson (encode)
 import qualified Data.Map as M
+import Text.Julius (rawJS)
 
 readTChanIO = atomically . readTChan
 
 getAppianLogR :: AppianLog -> Handler Html
 getAppianLogR logType = do
   webSockets $ socketLauncher logType
+  let navIdx = case logType of
+                 JBoss -> 1
+                 Application -> 2
   defaultLayout $(widgetFile "logfile")
 
 getLogPath :: MonadIO m => AppianLog -> TLogFileMap -> m (TChan ChannelMessage, FilePath)

@@ -1,5 +1,4 @@
-<form method=get action=@{ClearLogR logType}#form>
-     <button .btn .btn-danger type="submit" name="action" id="clearLog">
-             Clear Log File
+<button .btn .btn-danger onclick="clearLogOutput()" #clearLog>
+        Clear Log File
 <div #output>
      <p #log>

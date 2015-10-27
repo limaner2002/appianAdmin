@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Foundation where
 
 import Import.NoFoundation

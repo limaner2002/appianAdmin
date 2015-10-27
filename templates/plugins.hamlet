@@ -3,16 +3,16 @@ $if null fileList
 $else
   <h2>Submitted plugins
   <form method=post action=@{PluginsR} enctype=#{formEnctype}>
-    <!-- ^{tableWidget} -->
-    <table class="table table-striped">
-      <thead>
-        <th>File Name
-        <th>
-      <tbody>
-        $forall (file, idx) <- files
-                           <tr>
-                             <td>#{file}
-                             <td><input id="#{idx}" type="checkbox" name="checkbox" value="#{file}" :showVal id val:checked>
+    ^{tableWidget}
+    <!-- <table class="table table-striped"> -->
+    <!--   <thead> -->
+    <!--     <th>File Name -->
+    <!--     <th> -->
+    <!--   <tbody> -->
+    <!--     $forall (file, idx) <- files -->
+    <!--                        <tr> -->
+    <!--                          <td>#{file} -->
+    <!--                          <td><input id="#{idx}" type="checkbox" name="checkbox" value="#{file}" :showVal id val:checked> -->
     <button .btn .btn-danger .pull-right type="submit" value="delete" name="action">
       Delete
 

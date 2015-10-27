@@ -1,3 +1,15 @@
 $maybe msg <- mmsg
   <div #message>#{msg}
+<div class="navbar">
+  <ul class="nav nav-tabs" id="mainNav">
+      <li>
+          <a href=@{PluginsR}>
+             Plugins
+      <li>
+          <a href=@{AppianLogR JBoss}>
+             JBoss Log
+      <li>
+          <a href=@{AppianLogR Application}>
+             Application Server Log
+
 ^{widget}
