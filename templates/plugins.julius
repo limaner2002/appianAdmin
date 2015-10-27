@@ -1,0 +1,2 @@
+setActiveTab(#{rawJS $ show navIdx});
+

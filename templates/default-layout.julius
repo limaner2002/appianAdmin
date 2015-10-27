@@ -1,0 +1,100 @@
+var nav = document.getElementById("mainNav"),
+    tabs = nav.getElementsByTagName("li"),
+    main = document.getElementById("content"),
+    button = document.getElementById("clearLog"),
+    conn;
+
+function setActiveTab(idx){
+	 var nav = document.getElementById("mainNav"),
+	     tabs = nav.getElementsByTagName("li");
+	 tabs[idx].setAttribute("class", "active");
+}
+
+// function navClicked(tabs, idx){
+//     if(conn != null){
+// 	conn.close();
+//     }
+//     for(var i = 0; i < tabs.length; i++){
+// 	if(i == idx){
+// 	    tabs[i].setAttribute("class", "active");
+// 	    var uri = tabs[i].getAttribute("uri");
+// 	    httpGetAsync(uri, setContent, idx);
+// 	}
+// 	else{
+// 	    tabs[i].removeAttribute("class");
+// 	}
+//     }
+// }
+
+for(var i=0; i < tabs.length; i++){
+    var tab = tabs[i];
+    tab.onclick = function(tab, tabs, i)
+    {
+	return function(tab, tabs, i)
+	{
+	    tab.addEventListener("click",
+				 function() {
+				     navClicked(tabs, i)
+				 }
+				);
+	}(tab, tabs, i)
+    }(tab, tabs, i)
+}
+
+function httpGetAsync(theUrl, callback, idx){
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.onreadystatechange = function() {
+	if (xmlHttp.readyState == 4 && xmlHttp.status == 200){
+	    callback(xmlHttp.responseText);
+	    if(idx == 1 || idx == 2){
+		logListen(tabs[idx].getAttribute("uri"));
+	    }
+	    setClearListener(idx);
+	}
+    }
+    xmlHttp.open("GET", theUrl, true); // true for asynchronous
+    xmlHttp.send(null);
+}
+
+// function setContent(content){
+//     main.innerHTML = content;
+// }
+
+function logListen(uri){
+    var p = document.getElementById("log"),
+	uri = uri.replace("http:", "ws:").replace("https:", "wss:"),
+	output = document.getElementById("output");
+
+    output.appendChild(p);
+    console.log("Openining up a new websocket");
+    conn = new WebSocket(uri),
+    conn.onmessage = function(e) {
+	var msg = JSON.parse(e.data)
+	if(msg.type == "Data"){
+	    var lines = msg.contents.split("\n"),
+		line;
+	    for (var i = 0; i < lines.length; i++){
+    		line = lines[i];
+    		if(line.length > 0){
+    		    p.appendChild(document.createTextNode(line));
+    		    p.appendChild(document.createElement("br"));
+    		}
+	    }
+	}
+    };
+}
+
+function setClearListener(idx){
+    var button = document.getElementById("clearLog"),
+	logOutput = document.getElementById("log")
+
+    console.log("button is " + button);
+    if(button != null){
+	button.onclick = function() {
+	    while(logOutput.lastChild){
+		logOutput.removeChild(logOutput.lastChild);
+	    }
+	    console.log("Removing all text");
+	}
+    }
+}
