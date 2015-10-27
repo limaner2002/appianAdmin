@@ -49,9 +49,9 @@ postPluginsR = do
 
 sampleForm :: Form FileInfo
 sampleForm = renderBootstrap3 BootstrapBasicForm $
-               areq field "Plugin Jar File" Nothing 
+               areq (validate fileField) "Plugin Jar File" Nothing 
     where
-      field = check checkExtension fileField
+      validate = (check checkExtension) . (checkM checkExists)
 
 checkExtension :: FileInfo -> Either Text FileInfo
 checkExtension fi
@@ -60,6 +60,14 @@ checkExtension fi
   where
     fName = fileName fi
     msg = toMessage ("Please only upload .jar files" :: Text)
+
+checkExists :: FileInfo -> Handler (Either Text FileInfo)
+checkExists fi = do
+  let fName = fileName fi
+  mFileName <- runDB $ selectFirst [PluginFileName ==. fName] []
+  case mFileName of
+    Nothing -> return $ Right fi
+    Just _ -> return $ Left $ toMessage ("File already exists" :: Text)
 
 data Checkbox = Checkbox Html
 
