@@ -6,7 +6,8 @@ import Import.NoFoundation
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
 import Text.Hamlet          (hamletFile)
 import Text.Jasmine         (minifym)
-import Yesod.Auth.BrowserId (authBrowserId)
+-- import Yesod.Auth.BrowserId (authBrowserId)
+import Yesod.Auth.HashDB (authHashDB, getAuthIdHashDB)
 import Yesod.Auth.Message   (AuthMessage (InvalidLogin))
 import Yesod.Default.Util   (addStaticContentExternal)
 import Yesod.Core.Types     (Logger)
@@ -17,6 +18,7 @@ import qualified Data.Text as T
 
 import System.Directory
 import System.FilePath
+import BulkDownloader.Downloader
 
 type FileName = Text
 type Path = Text
@@ -39,6 +41,7 @@ data App = App
     , dbLock            :: STM.TVar Bool
     , currentLogUsers   :: TWatchDirMap
     , logFiles          :: TLogFileMap
+    , getDownloader     :: BulkDownload
     }
 
 instance HasHttpManager App where
@@ -95,6 +98,8 @@ instance Yesod App where
     isAuthorized (AuthR _) _ = return Authorized
     isAuthorized FaviconR _ = return Authorized
     isAuthorized RobotsR _ = return Authorized
+    isAuthorized (DownloadR (BulkDownloadR AppianInstall)) _ = isAdmin
+    isAuthorized (DownloadR (BulkDownloadR _)) _ = return Authorized
     -- Default to Authorized for now.
     isAuthorized _ _ = return Authorized
 
@@ -138,7 +143,7 @@ instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
 
 instance YesodAuth App where
-    type AuthId App = UserId
+    type AuthId App = PersonId
 
     -- Where to send a user after successful login
     loginDest _ = HomeR
@@ -147,16 +152,48 @@ instance YesodAuth App where
     -- Override the above two destinations when a Referer: header is present
     redirectToReferer _ = True
 
-    authenticate creds = runDB $ do
-        x <- getBy $ UniqueUser $ credsIdent creds
-        return $ case x of
-            Just (Entity uid _) -> Authenticated uid
-            Nothing -> UserError InvalidLogin
+    -- authenticate creds = runDB $ do
+    --     x <- getBy $ UniqueUser $ credsIdent creds
+    --     return $ case x of
+    --         Just (Entity uid _) -> Authenticated uid
+    --         Nothing -> UserError InvalidLogin
+
+    authenticate creds = do -- getAuthIdHashDB AuthR (Just . UniquePerson) creds
+       let uniq = Just . UniquePerson
+       muid <- maybeAuthId
+       case muid of
+         Just uid -> return $ Authenticated uid
+         Nothing -> do
+            x <- case uniq (credsIdent creds) of
+                   Nothing -> return Nothing
+                   Just u -> runDB (getBy u)
+            case x of
+              Just (Entity uid _) -> return $ Authenticated uid
+              Nothing -> return $ UserError InvalidLogin
 
     -- You can add other plugins like BrowserID, email or OAuth here
-    authPlugins _ = [authBrowserId def]
+    authPlugins _ = [authHashDB (Just . UniquePerson)]
+
+    -- -- You can add other plugins like BrowserID, email or OAuth here
+    -- authPlugins _ = [authBrowserId def]
 
     authHttpManager = getHttpManager
+
+-- instance YesodAuth App where
+--     type AuthId App = PersonId
+
+--     -- Where to send a user after successful login
+--     loginDest _ = HomeR
+--     -- Where to send a user after logout
+--     logoutDest _ = HomeR
+--     -- Override the above two destinations when a Referer: header is present
+--     redirectToReferer _ = True
+
+--     getAuthId creds = getAuthIdHashDB AuthR (Just . UniquePerson) creds
+--     -- You can add other plugins like BrowserID, email or OAuth here
+--     authPlugins _ = [authHashDB (Just . UniquePerson)]
+
+--     authHttpManager = getHttpManager
 
 instance YesodAuthPersist App
 
@@ -242,3 +279,24 @@ decLogUsers path = do
 getLogFilePath = do
   app <- getYesod
   return $ logFiles app
+
+isAdmin :: YesodAuth site => HandlerT site IO AuthResult
+isAdmin = return Authorized
+-- isAdmin = do
+--   mu <- maybeAuthId
+--   case mu of
+--       Nothing -> return AuthenticationRequired
+--       Just uid -> do
+--          x <- runDB (getBy uid)
+--          case x of
+--            Nothing -> return $ Unauthorized "You are not allowed to view this"
+--            Just (Entity a b) ->
+--                case personIdent b of
+--                  "joshua_mccartney" -> return Authorized
+--                  _ -> return $ Unauthorized "You are not allowed to view this"
+--       -- case mu of
+--       --   Nothing -> AuthenticationRequired
+--       --   Just user ->
+--       --       case personIdent user of
+--       --         "joshua_mccartney" -> Authorized
+--       --         _ -> Unauthorized "You are not authorized to view this"

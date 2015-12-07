@@ -58,6 +58,7 @@ library
                  , yesod-auth
                  , yesod-static
                  , yesod-form
+                 , yesod-auth-hashdb
                  , classy-prelude
                  , classy-prelude-conduit
                  , classy-prelude-yesod
@@ -98,6 +99,7 @@ library
                  , filepath
                  , mtl
                  , blaze-html
+                 , bulk-downloader
 
 executable         appianAdmin
     if flag(library-only)

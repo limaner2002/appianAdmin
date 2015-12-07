@@ -4,5 +4,8 @@ flags:
     dev: true
 packages:
 - '.'
+- bulk-downloader
+
+
 extra-deps: []
-resolver: lts-3.0
+resolver: lts-3.11

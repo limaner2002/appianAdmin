@@ -2,6 +2,7 @@ module Model where
 
 import ClassyPrelude.Yesod
 import Database.Persist.Quasi
+import Yesod.Auth.HashDB
 
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
@@ -82,3 +83,6 @@ instance ToJSON ChannelMessage where
 -- instance Monoid AppianLogMessage where
 --     mempty = AppianLogMessage mempty 0
 
+instance HashDBUser Person where
+    userPasswordHash = Just . personPassword
+    setPasswordHash h p = p { personPassword = h}

@@ -1,12 +1,11 @@
-User
+Person
     ident Text
-    password Text Maybe
-    UniqueUser ident
+    password Text
+    UniquePerson ident
     deriving Typeable
-    Primary ident
 Email
     email Text
-    user UserId Maybe
+    user PersonId Maybe
     verkey Text Maybe
     UniqueEmail email
 Plugin

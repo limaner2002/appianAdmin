@@ -11,5 +11,8 @@ $maybe msg <- mmsg
       <li>
           <a href=@{AppianLogR Application}>
              Application Server Log
+      <li>
+          <a href=@{DownloadR (BulkDownloadR Tmp)}>
+             Appian Jar Libraries
 
 ^{widget}

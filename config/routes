@@ -9,3 +9,4 @@
 /plugins PluginsR GET POST
 /clearLog/#AppianLog ClearLogR GET
 /navPos/#Int NavPosR GET
+/libs DownloadR BulkDownload getDownloader
