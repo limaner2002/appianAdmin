@@ -281,22 +281,24 @@ getLogFilePath = do
   return $ logFiles app
 
 isAdmin :: YesodAuth site => HandlerT site IO AuthResult
-isAdmin = return Authorized
--- isAdmin = do
---   mu <- maybeAuthId
---   case mu of
---       Nothing -> return AuthenticationRequired
---       Just uid -> do
---          x <- runDB (getBy uid)
---          case x of
---            Nothing -> return $ Unauthorized "You are not allowed to view this"
---            Just (Entity a b) ->
---                case personIdent b of
---                  "joshua_mccartney" -> return Authorized
---                  _ -> return $ Unauthorized "You are not allowed to view this"
---       -- case mu of
---       --   Nothing -> AuthenticationRequired
---       --   Just user ->
---       --       case personIdent user of
---       --         "joshua_mccartney" -> Authorized
---       --         _ -> Unauthorized "You are not authorized to view this"
+-- isAdmin = return Authorized
+isAdmin = do
+  mu <- maybeAuthId
+  case mu of
+      Nothing -> return AuthenticationRequired
+      Just _ -> return Authorized
+      -- Just uid -> do
+      --    x <- runDB (getBy uid)
+      --    case x of
+      --      Nothing -> return $ Unauthorized "You are not allowed to view this"
+      --      Just _ -> return Authorized
+           -- Just (Entity a b) ->
+           --     case personIdent b of
+           --       "joshua_mccartney" -> return Authorized
+           --       _ -> return $ Unauthorized "You are not allowed to view this"
+      -- case mu of
+      --   Nothing -> AuthenticationRequired
+      --   Just user ->
+      --       case personIdent user of
+      --         "joshua_mccartney" -> Authorized
+      --         _ -> Unauthorized "You are not authorized to view this"
