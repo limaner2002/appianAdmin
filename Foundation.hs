@@ -15,11 +15,16 @@ import qualified Yesod.Core.Unsafe as Unsafe
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.ByteString.Builder (toLazyByteString)
 
 import System.Directory
 import System.FilePath
 import BulkDownloader.Downloader
 import AppianMonitor.AppianMonitor
+
+import Lucid hiding (Html)
+import Lucid.Bootstrap
+import LucidBootstrapLayout.Bootstrap
 
 type FileName = Text
 type Path = Text
@@ -100,8 +105,8 @@ instance Yesod App where
     isAuthorized (AuthR _) _ = return Authorized
     isAuthorized FaviconR _ = return Authorized
     isAuthorized RobotsR _ = return Authorized
-    isAuthorized (DownloadR (BulkDownloadR AppianInstall)) _ = isAdmin
-    isAuthorized (DownloadR (BulkDownloadR _)) _ = return Authorized
+    -- isAuthorized (DownloadR (BulkDownloadR AppianInstall)) _ = isAdmin
+    -- isAuthorized (DownloadR (BulkDownloadR _)) _ = return Authorized
     -- Default to Authorized for now.
     isAuthorized _ _ = return Authorized
 
@@ -304,3 +309,19 @@ isAdmin = do
       --       case personIdent user of
       --         "joshua_mccartney" -> Authorized
       --         _ -> Unauthorized "You are not authorized to view this"
+
+instance Bootstrap App where
+    mainLayout input = do
+      app <- getYesod
+      return $ html_ $ do
+                   head_ (do
+                       title_ "Bootstrap Test"
+                       link_ [rel_ "stylesheet", type_"text/css", href_ (stylePath app)]
+                         )
+                   body_ $
+                       container_ input
+     where
+       stylePath app = decode $ Import.NoFoundation.joinPath app (root app) pieces params
+       (pieces, params) = renderRoute $ StaticR css_bootstrap_css
+       root = appRoot . appSettings
+       decode = toStrict . decodeUtf8 . toLazyByteString

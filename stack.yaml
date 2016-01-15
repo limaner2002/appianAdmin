@@ -7,6 +7,8 @@ packages:
 - bulk-downloader
 - zip-archive
 - appian-monitor
+- yesod-lucid
+- lucid-bootstrap
 
 extra-deps: []
 resolver: lts-4.1

@@ -101,6 +101,10 @@ library
                  , blaze-html
                  , bulk-downloader
                  , appian-monitor
+                 , yesod-lucid
+                 , lucid
+                 , lucid-bootstrap
+
 
 executable         appianAdmin
     if flag(library-only)
