@@ -10,3 +10,4 @@
 /clearLog/#AppianLog ClearLogR GET
 /navPos/#Int NavPosR GET
 /libs DownloadR BulkDownload getDownloader
+/vmStatus VMStatusR AppianMonitor getMonitor

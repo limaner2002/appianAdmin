@@ -37,6 +37,7 @@ import Handler.Plugins
 import Handler.ClearLog
 import Handler.NavPos
 import BulkDownloader.Downloader (BulkDownload(..))
+import AppianMonitor.AppianMonitor (AppianMonitor(..))
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -75,6 +76,7 @@ makeFoundation appSettings = do
         currentLogUsers = watchDirMap
         logFiles = emptyLogFileMap
         getDownloader = BulkDownload
+        getMonitor = AppianMonitor
 
     -- Create the database connection pool
     pool <- flip runLoggingT logFunc $ createSqlitePool

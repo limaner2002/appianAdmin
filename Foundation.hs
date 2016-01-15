@@ -19,6 +19,7 @@ import qualified Data.Text as T
 import System.Directory
 import System.FilePath
 import BulkDownloader.Downloader
+import AppianMonitor.AppianMonitor
 
 type FileName = Text
 type Path = Text
@@ -42,6 +43,7 @@ data App = App
     , currentLogUsers   :: TWatchDirMap
     , logFiles          :: TLogFileMap
     , getDownloader     :: BulkDownload
+    , getMonitor :: AppianMonitor
     }
 
 instance HasHttpManager App where

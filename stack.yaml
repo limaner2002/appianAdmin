@@ -1,11 +1,12 @@
 flags:
   appianAdmin:
     library-only: false
-    dev: true
+    dev: false
 packages:
 - '.'
 - bulk-downloader
-
+- zip-archive
+- appian-monitor
 
 extra-deps: []
-resolver: lts-3.11
+resolver: lts-4.1
